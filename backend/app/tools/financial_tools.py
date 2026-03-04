@@ -208,19 +208,16 @@ async def show_savings_plan(user_id: str) -> str:
 
 
 @tool
-async def suggest_actions(context: str) -> str:
+async def suggest_actions(chips: list[str]) -> str:
     """
-    Suggest 2-3 contextually relevant action chips for the user to tap next.
-    Pass a brief description of what was just shown (e.g. 'showed resilience score of 42').
+    Render 2-4 contextual action chips for the user to tap next.
+    YOU decide what chips to show based on the conversation so far.
+    Pass a list of short, tappable suggestion strings relevant to the user's situation.
+    Example: ["What if I lose my job?", "Show me a savings plan", "How do I cut BNPL debt?"]
+    Always call this at the end of the initial scan and after any major answer.
     """
-    # The LLM picks from these based on context — return a structured chips list
-    # This tool is a signal to the frontend to render action chips
     data = {
         "card": "chips",
-        "chips": [
-            "What if I lose my job for 3 months?",
-            "Show me a savings plan",
-            "What if I get seriously ill?",
-        ],
+        "chips": chips[:4],  # cap at 4 so the UI doesn't overflow
     }
     return json.dumps(data)

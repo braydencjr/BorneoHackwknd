@@ -10,3 +10,9 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     user_id: str = "demo_user"  # will be overridden by auth dependency
+
+
+class ResumeRequest(BaseModel):
+    """Sent by the frontend to resume a HITL-interrupted agent run."""
+    approved: bool
+    reason: str = ""  # optional human note (e.g. "I'd rather read it later")

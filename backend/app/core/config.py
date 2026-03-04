@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.0-flash"
 
+    # Anthropic Claude — optional; used for educator subagent if set
+    CLAUDE_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-sonnet-4-6"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
