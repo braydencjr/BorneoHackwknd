@@ -1,103 +1,165 @@
-import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from 'react';
+import { Animated, SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
+
+import ResilienceChat from '@/components/resilience/resilience-chat';
+import { ResilienceProvider, useResilience } from '@/context/resilience-context';
+
+const TIER_COLORS = { strong: '#0FB67C', moderate: '#F5A623', critical: '#FF4757' };
+
+function ScoreBadge() {
+  const { resilienceScore } = useResilience();
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.8)).current;
+
+  useEffect(() => {
+    if (resilienceScore !== null) {
+      Animated.parallel([
+        Animated.timing(opacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [resilienceScore]);
+
+  if (resilienceScore === null) {
+    return (
+      <View style={styles.badgePlaceholder}>
+        <Text style={styles.badgePlaceholderText}>— —</Text>
+      </View>
+    );
+  }
+
+  const tier =
+    resilienceScore >= 70 ? 'strong' : resilienceScore >= 40 ? 'moderate' : 'critical';
+  const color = TIER_COLORS[tier];
+
+  return (
+    <Animated.View
+      style={[
+        styles.scoreBadge,
+        { borderColor: color + '55', opacity, transform: [{ scale }] },
+      ]}
+    >
+      <Text style={[styles.scoreNumber, { color }]}>{Math.round(resilienceScore)}</Text>
+      <Text style={[styles.scoreSlash, { color }]}>/100</Text>
+    </Animated.View>
+  );
+}
+
+function ResiliencePageInner() {
+  return (
+    <SafeAreaView style={styles.root}>
+      <StatusBar barStyle="light-content" backgroundColor="#060D1A" />
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.aiOrb}>
+            <Text style={styles.aiOrbText}>AI</Text>
+          </View>
+          <View>
+            <Text style={styles.headerTitle}>FinShield AI</Text>
+            <Text style={styles.headerSub}>Financial Resilience Agent</Text>
+          </View>
+        </View>
+        <ScoreBadge />
+      </View>
+
+      {/* Divider */}
+      <View style={styles.divider} />
+
+      {/* Chat */}
+      <ResilienceChat />
+    </SafeAreaView>
+  );
+}
 
 export default function ResiliencePage() {
   return (
-    <ScrollView style={styles.container}>
-
-      <Text style={styles.title}>Financial Resilience</Text>
-      <Text style={styles.subtitle}>
-        Stay prepared for unexpected expenses.
-      </Text>
-
-      <View style={styles.card}>
-        <Ionicons name="wallet-outline" size={28} color="#1E3A8A" />
-        <View style={styles.textBox}>
-          <Text style={styles.cardTitle}>Emergency Fund</Text>
-          <Text style={styles.cardDesc}>
-            You have saved 3 months of expenses.
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Ionicons name="alert-circle-outline" size={28} color="#1E3A8A" />
-        <View style={styles.textBox}>
-          <Text style={styles.cardTitle}>Unexpected Expenses</Text>
-          <Text style={styles.cardDesc}>
-            Track sudden expenses to stay prepared.
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Ionicons name="trending-up-outline" size={28} color="#1E3A8A" />
-        <View style={styles.textBox}>
-          <Text style={styles.cardTitle}>Savings Growth</Text>
-          <Text style={styles.cardDesc}>
-            Increase your monthly savings to build resilience.
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Ionicons name="shield-checkmark-outline" size={28} color="#1E3A8A" />
-        <View style={styles.textBox}>
-          <Text style={styles.cardTitle}>Financial Safety Tip</Text>
-          <Text style={styles.cardDesc}>
-            Aim for 6 months of living expenses saved.
-          </Text>
-        </View>
-      </View>
-
-    </ScrollView>
+    <ResilienceProvider>
+      <ResiliencePageInner />
+    </ResilienceProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: "#F5F7FB",
-    padding: 20,
+    backgroundColor: '#060D1A',
   },
-
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 6,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
-
-  subtitle: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 20,
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-
-  card: {
-    flexDirection: "row",
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 15,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
+  aiOrb: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(79,142,247,0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(79,142,247,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-
-  textBox: {
-    marginLeft: 12,
-    flex: 1,
+  aiOrbText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#4F8EF7',
+    letterSpacing: 0.5,
   },
-
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "600",
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#E8EEFF',
+    letterSpacing: 0.3,
   },
-
-  cardDesc: {
+  headerSub: {
+    fontSize: 11,
+    color: '#4A6080',
+    marginTop: 1,
+  },
+  scoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  scoreNumber: {
+    fontSize: 18,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  scoreSlash: {
+    fontSize: 11,
+    fontWeight: '500',
+    opacity: 0.6,
+  },
+  badgePlaceholder: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  badgePlaceholderText: {
     fontSize: 13,
-    color: "#666",
-    marginTop: 3,
+    color: '#4A6080',
+    letterSpacing: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
 });

@@ -75,3 +75,4 @@ backend/dev.db
 backend/.env
 
 db-setup/
+docs/
