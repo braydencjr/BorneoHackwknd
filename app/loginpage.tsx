@@ -1,5 +1,8 @@
+import { Ionicons } from "@expo/vector-icons";
+import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 
 export default function Login() {
@@ -7,6 +10,19 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
+  WebBrowser.maybeCompleteAuthSession();
+
+const [request, response, promptAsync] = Google.useAuthRequest({
+  clientId: "YOUR_GOOGLE_CLIENT_ID",
+});
+
+useEffect(() => {
+  if (response?.type === "success") {
+    console.log("Google login success");
+    router.replace("/(tabs)/homepage");
+  }
+}, [response]);
 
   return (
     <View style={styles.container}>
@@ -50,6 +66,15 @@ export default function Login() {
       <View style={styles.divider} />
 
       <Text style={styles.signInWith}>Sign in With :</Text>
+
+      <TouchableOpacity
+  style={styles.googleButton}
+  disabled={!request}
+  onPress={() => promptAsync()}
+>
+  <Ionicons name="logo-google" size={20} color="white" />
+  <Text style={styles.googleText}> Sign up with Google</Text>
+</TouchableOpacity>
 
       {/* Sign Up Button */}
       <TouchableOpacity 
@@ -147,4 +172,21 @@ const styles = StyleSheet.create({
   signUpText: {
     fontSize: 20,
   },
+
+  googleButton: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: "#DB4437",
+  width: "80%",
+  height: 50,
+  borderRadius: 25,
+  marginBottom: 20,
+},
+
+googleText: {
+  color: "white",
+  fontSize: 18,
+  marginLeft: 10,
+},
 });
