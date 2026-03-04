@@ -37,14 +37,35 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
+      name = "resiliencepage"
+      options={{
+        title:"Resilience",
+        tabBarIcon: ({ color, size }) => (
+          <Ionicons name="shield-checkmark-outline" size={size} color={color} />
+        ),
+      }}
+      />      
+
+<Tabs.Screen
+  name="contingencypage"
+  options={{
+    title: "Contingency",
+    tabBarIcon: ({ color, size }) => (
+      <Ionicons name="alert-circle-outline" size={size} color={color} />
+    ),
+  }}
+/>
+
+ <Tabs.Screen
   name="settingspage"
   options={{
     title: "Settings",
     tabBarIcon: ({ color, size }) => (
-      <Ionicons name="settings-outline" size={size} color={color} />
+      <Ionicons name="settings" size={size} color={color} />
     ),
   }}
-/>  
+/>
+
     </Tabs>
   );
 } 

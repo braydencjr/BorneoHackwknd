@@ -22,6 +22,10 @@ export default function ContingencyPage() {
   return (
     <ScrollView style={styles.container}>
 
+       <Text style={styles.title}>Contingency Planning</Text>
+            <Text style={styles.subtitle}>
+              Prepare for unexpected financial challenges with a solid backup plan.
+            </Text>
 
 <View style={styles.cardWrapper}>
 
@@ -237,7 +241,7 @@ const styles = StyleSheet.create({
   },
 
   cardWrapper: {
-  marginTop: 60,
+  marginTop: 40,
   alignItems: "center",
   position: "relative",
 },
@@ -297,5 +301,18 @@ indicator: {
   backgroundColor: "#FFFFFF",
   borderRadius: 2,
 },
+
+title: {
+    marginTop : 24,
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+
+  subtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 20,
+  },
 
 });
