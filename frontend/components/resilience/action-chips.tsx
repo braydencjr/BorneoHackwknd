@@ -1,6 +1,6 @@
+import type { ChipsData } from '@/hooks/use-resilience-stream';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { ChipsData } from '@/hooks/use-resilience-stream';
 
 type Props = {
   data: ChipsData;

@@ -1,6 +1,6 @@
+import type { ScoreData } from '@/hooks/use-resilience-stream';
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
-import type { ScoreData } from '@/hooks/use-resilience-stream';
 
 const TIER_COLORS = {
   strong: '#0FB67C',

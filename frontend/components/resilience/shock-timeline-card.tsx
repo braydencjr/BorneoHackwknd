@@ -1,6 +1,6 @@
+import type { ShockData } from '@/hooks/use-resilience-stream';
 import React, { useEffect, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
-import type { ShockData } from '@/hooks/use-resilience-stream';
 
 const SCENARIO_LABELS: Record<string, string> = {
   illness: '🤒 Medical Crisis',

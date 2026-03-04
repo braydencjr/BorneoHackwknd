@@ -1,6 +1,6 @@
+import type { PlanData } from '@/hooks/use-resilience-stream';
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { PlanData } from '@/hooks/use-resilience-stream';
 
 const TIER_ICONS = {
   aggressive: '🚀',

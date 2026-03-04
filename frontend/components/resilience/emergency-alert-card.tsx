@@ -1,6 +1,6 @@
+import type { AlertData } from '@/hooks/use-resilience-stream';
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
-import type { AlertData } from '@/hooks/use-resilience-stream';
 
 const URGENCY_CONFIG: Record<string, { color: string; bg: string; label: string; icon: string }> = {
   critical: { color: '#FF4757', bg: 'rgba(255,71,87,0.08)', label: 'CRITICAL ALERT', icon: '🚨' },
