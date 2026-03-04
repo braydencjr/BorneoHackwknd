@@ -1,0 +1,21 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic[email]>=2.0.0
+pydantic-settings>=2.0.0
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.12
+python-dotenv>=1.0.0
+
+# Async database
+sqlalchemy[asyncio]>=2.0.0
+aiosqlite>=0.20.0          # SQLite async driver (dev)
+aiomysql>=0.2.0            # MySQL async driver (aiomysql)
+asyncmy>=0.2.9             # MySQL async driver (asyncmy, better SSL on Windows)
+# asyncpg>=0.30.0          # Uncomment for PostgreSQL in production
+alembic>=1.14.0            # Database migrations
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+httpx>=0.28.0              # async test client

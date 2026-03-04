@@ -41,3 +41,37 @@ app-example
 # generated native folders
 /ios
 /android
+/.vscode
+
+# ── Backend (FastAPI / Python) ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+htmlcov/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+*.log
+
+# SQLite dev database
+backend/*.db
+backend/dev.db
+
+# Backend local env
+backend/.env
+
+db-setup/
