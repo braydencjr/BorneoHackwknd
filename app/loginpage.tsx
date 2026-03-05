@@ -1,28 +1,40 @@
+import { useGoogleAuth } from "@/services/useGoogleAuth";
 import { Ionicons } from "@expo/vector-icons";
-import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { loginWithGoogle } from "../services/authService";
 
 export default function Login() {
+  const { request, response, promptAsync } = useGoogleAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  WebBrowser.maybeCompleteAuthSession();
-
-const [request, response, promptAsync] = Google.useAuthRequest({
-  clientId: "YOUR_GOOGLE_CLIENT_ID",
-});
+  const [loading, setLoading] = useState(false);
 
 useEffect(() => {
-  if (response?.type === "success") {
-    console.log("Google login success");
-    router.replace("/(tabs)/homepage");
-  }
-}, [response]);
+  const handleGoogleLogin = async () => {
+    if (response?.type === "success") {
+      const idToken = response.authentication?.idToken;
+
+      try {
+  setLoading(true);
+
+  await loginWithGoogle(idToken);
+
+  router.replace("/(tabs)/homepage");
+
+} catch (error) {
+  console.error("Google login failed:", error);
+} finally {
+  setLoading(false);
+}
+    }
+  };
+
+  handleGoogleLogin();
+}, [response, router]);
 
   return (
     <View style={styles.container}>
@@ -69,11 +81,11 @@ useEffect(() => {
 
       <TouchableOpacity
   style={styles.googleButton}
-  disabled={!request}
+  disabled={!request || loading}
   onPress={() => promptAsync()}
 >
   <Ionicons name="logo-google" size={20} color="white" />
-  <Text style={styles.googleText}> Sign up with Google</Text>
+  <Text style={styles.googleText}></Text>
 </TouchableOpacity>
 
       {/* Sign Up Button */}
