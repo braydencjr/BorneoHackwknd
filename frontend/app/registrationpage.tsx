@@ -10,6 +10,48 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const handleRegister = async () => {
+    console.log("Sign Up Button Pressed!");
+    console.log("API URL:", process.env.EXPO_PUBLIC_API_URL);
+
+  try {
+    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/auth/send-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password,
+        name: username
+      }),
+    });
+
+    console.log("Response status:", res.status);
+
+    const data = await res.json();
+    console.log("Response data:", data);
+
+    if (res.ok) {
+      router.push({
+  pathname: "/otp",
+  params: {
+    email,
+    name: username,
+    password
+  }
+});
+    } else {
+      alert(data.detail || "Otp Sent failed");
+    }
+
+  } catch (error) {
+    console.error(error);
+    alert("Network error");
+  }
+};
+
+
   return (
     <View style={styles.container}>
 
@@ -55,10 +97,9 @@ export default function Register() {
 
       {/* Sign Up Button */}
       <TouchableOpacity
-        style={styles.signUpButton}
-        onPress={() => router.replace("/loginpage")}
-      >
-        <Text style={styles.signUpText}>Sign Up</Text>
+      style={styles.signUpButton}
+      onPress={handleRegister} >
+       <Text style={styles.signUpText}>Sign Up</Text>
       </TouchableOpacity>
 
     </View>

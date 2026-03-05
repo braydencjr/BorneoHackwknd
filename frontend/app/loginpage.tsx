@@ -1,28 +1,70 @@
-import { Ionicons } from "@expo/vector-icons";
-import * as Google from "expo-auth-session/providers/google";
+import { useGoogleAuth } from "@/services/useGoogleAuth";
+import { AntDesign } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { loginWithGoogle } from "../services/authService";
 
 export default function Login() {
+  const { request, response, promptAsync } = useGoogleAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  WebBrowser.maybeCompleteAuthSession();
+  const handleLogin = async () => {
+  try {
 
-const [request, response, promptAsync] = Google.useAuthRequest({
-  clientId: "YOUR_GOOGLE_CLIENT_ID",
-});
+    const formBody = new URLSearchParams({
+      username: email,
+      password: password
+    }).toString();
+
+    const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: formBody
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      router.replace("/(tabs)/homepage");
+    } else {
+      alert("Invalid email or password");
+    }
+
+  } catch (error) {
+    console.error(error);
+    alert("Network error");
+  }
+};
 
 useEffect(() => {
-  if (response?.type === "success") {
-    console.log("Google login success");
-    router.replace("/(tabs)/homepage");
-  }
-}, [response]);
+  const handleGoogleLogin = async () => {
+    if (response?.type === "success") {
+      const idToken = response.authentication?.idToken;
+
+      try {
+  setLoading(true);
+
+  await loginWithGoogle(idToken);
+
+  router.replace("/(tabs)/homepage");
+
+} catch (error) {
+  console.error("Google login failed:", error);
+} finally {
+  setLoading(false);
+}
+    }
+  };
+
+  handleGoogleLogin();
+}, [response, router]);
 
   return (
     <View style={styles.container}>
@@ -57,7 +99,7 @@ useEffect(() => {
       {/* Confirm Button */}
       <TouchableOpacity
         style={styles.confirmButton}
-        onPress={() => router.replace("/(tabs)/homepage")}
+        onPress={handleLogin}
       >
         <Text style={styles.confirmText}>Confirm</Text>
       </TouchableOpacity>
@@ -67,13 +109,13 @@ useEffect(() => {
 
       <Text style={styles.signInWith}>Sign in With :</Text>
 
-      <TouchableOpacity
+<TouchableOpacity
   style={styles.googleButton}
-  disabled={!request}
+  disabled={!request || loading}
   onPress={() => promptAsync()}
 >
-  <Ionicons name="logo-google" size={20} color="white" />
-  <Text style={styles.googleText}> Sign up with Google</Text>
+  <AntDesign name="google" size={22} color="white" />
+  <Text style={styles.googleText}>Sign in with Google</Text>
 </TouchableOpacity>
 
       {/* Sign Up Button */}
@@ -87,12 +129,13 @@ useEffect(() => {
   );
 }
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",
     alignItems: "center",
-    paddingTop: 80,
+    paddingTop: 60,
     paddingHorizontal: 30,
   },
 
@@ -102,20 +145,20 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     borderWidth: 2,
     borderColor: "#0F3D91",
-    marginBottom: 20,
+    marginBottom: 10,
   },
 
   appName: {
     fontSize: 32,
     fontWeight: "500",
-    marginBottom: 40,
+    marginBottom: 20,
   },
 
   label: {
     alignSelf: "flex-start",
     fontSize: 18,
     marginBottom: 8,
-    marginTop: 10,
+    marginTop: 3,
   },
 
   input: {
@@ -156,12 +199,13 @@ const styles = StyleSheet.create({
   },
 
   signInWith: {
-    marginBottom: 40,
+    marginBottom: 8,
   },
 
   signUpButton: {
     width: "80%",
     height: 50,
+    marginTop:8,
     borderRadius: 25,
     borderWidth: 1.5,
     borderColor: "#0F2E6D",
@@ -173,20 +217,22 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 
-  googleButton: {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: "#DB4437",
-  width: "80%",
-  height: 50,
-  borderRadius: 25,
-  marginBottom: 20,
-},
-
 googleText: {
   color: "white",
   fontSize: 18,
   marginLeft: 10,
 },
+
+googleButton: {
+  width: "80%",
+  height: 50,
+  paddingBottom:8,
+  backgroundColor: "#0F2E6D",
+  paddingVertical: 8,
+  borderRadius: 30,
+  alignItems: "center",
+  flexDirection: "row",
+  justifyContent: "center",
+  gap: 10
+}
 });
