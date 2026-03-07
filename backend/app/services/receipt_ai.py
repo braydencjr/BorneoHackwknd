@@ -13,13 +13,13 @@ async def categorize_receipt(text: str):
 You are a financial receipt analyzer.
 
 Extract:
-1. spending category
-2. total amount
-3. transaction type (income or expense)
+- category
+- total amount
+- transaction type
 
-Definitions:
-- income = money received (salary, refund, payment received)
-- expense = money spent (shopping, medical, food, transport)
+Transaction type:
+income = money received
+expense = money spent
 
 Allowed categories:
 Food, Entertainment, Transport, Shopping, Health, Others
@@ -27,12 +27,12 @@ Food, Entertainment, Transport, Shopping, Health, Others
 Receipt text:
 {text}
 
-Return ONLY JSON:
+Return ONLY valid JSON:
 
 {{
-  "category": "Health",
-  "total": 155.00,
-  "type": "expense"
+"category": "Food",
+"total": 18.50,
+"type": "expense"
 }}
 """
 

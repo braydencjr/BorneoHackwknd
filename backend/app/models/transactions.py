@@ -11,9 +11,9 @@ class Transaction(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-
-    merchant_name: Mapped[str] = mapped_column(String(255))
     amount: Mapped[float] = mapped_column(Float)
+    type: Mapped[str] = mapped_column(String(50))
+    merchant_name: Mapped[str] = mapped_column(String(255))
     category: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     receipt_image: Mapped[str] = mapped_column(String(500))

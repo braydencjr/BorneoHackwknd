@@ -17,20 +17,23 @@ async def create_transaction(
     payload: TransactionCreate,
     db: AsyncSession = Depends(get_db),
 ):
+    current_user: User = Depends(get_current_user)
 
     result = await categorize_receipt(payload.text)
 
     category = result["category"]
     total = result["total"]
+    transaction_type = result["type"]
 
     transaction = await transaction_repository.create(
-        db=db,
-        user_id=1,
-        merchant_name=payload.merchant_name,
-        amount=total,
-        category=category,
-        receipt_image=payload.receipt_image,
-    )
+    db=db,
+    user_id=current_user.id,
+    merchant_name=payload.merchant_name,
+    amount=total,
+    category=category,
+    type=transaction_type,
+    receipt_image=payload.receipt_image,
+)
 
     return transaction
 

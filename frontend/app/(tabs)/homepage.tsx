@@ -77,7 +77,9 @@ export default function HomePage() {
     return words.map(w => w[0]).join("").slice(0, 3).toUpperCase();
   }
 
-  const incomeTransactions = transactions.filter(t => t.amount > 0);
+  const incomeTransactions = transactions.filter(
+  t => t.type === "income"
+);
 
 const incomeTotal = incomeTransactions.reduce(
   (sum, t) => sum + t.amount,
@@ -104,7 +106,9 @@ const incomeCategories = Object.values(
   percentage: incomeTotal > 0 ? (c.amount / incomeTotal) * 100 : 0
 }));
 
-const outcomeTransactions = transactions.filter(t => t.amount <= 0);
+const outcomeTransactions = transactions.filter(
+  t => t.type === "expense"
+);
 
 const outcomeTotal = outcomeTransactions.reduce(
   (sum, t) => sum + Math.abs(t.amount),

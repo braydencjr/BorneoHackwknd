@@ -7,22 +7,24 @@ from app.models.transactions import Transaction
 class TransactionRepository:
 
     async def create(
-        self,
-        db: AsyncSession,
-        user_id: int,
-        merchant_name: str,
-        amount: float,
-        category: str,
-        receipt_image: str,
-    ) -> Transaction:
+    self,
+    db: AsyncSession,
+    user_id: int,
+    merchant_name: str,
+    amount: float,
+    category: str,
+    type: str,
+    receipt_image: str,
+) -> Transaction:
 
         transaction = Transaction(
-            user_id=user_id,
-            merchant_name=merchant_name,
-            amount=amount,
-            category=category,
-            receipt_image=receipt_image,
-        )
+    user_id=user_id,
+    merchant_name=merchant_name,
+    amount=amount,
+    category=category,
+    type=type,
+    receipt_image=receipt_image,
+)
 
         db.add(transaction)
         await db.flush()
