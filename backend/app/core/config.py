@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # Set to False to skip CA verification (needed when CA cert lacks keyUsage extension)
     MYSQL_SSL_VERIFY: bool = False
 
+    # LLM — spending analysis (Anthropic Claude or OpenAI GPT)
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "claude-sonnet-4-20250514"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

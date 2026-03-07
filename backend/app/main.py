@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.routes import health, auth
+from app.routes import health, auth, spending
 
 settings = get_settings()
 
@@ -48,5 +48,6 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Routers — all endpoints live under /api/v1 for versioning
 # ---------------------------------------------------------------------------
-app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
-app.include_router(auth.router,   prefix="/api/v1/auth",   tags=["auth"])
+app.include_router(health.router,    prefix="/api/v1/health",    tags=["health"])
+app.include_router(auth.router,      prefix="/api/v1/auth",      tags=["auth"])
+app.include_router(spending.router,  prefix="/api/v1/spending",  tags=["spending"])
