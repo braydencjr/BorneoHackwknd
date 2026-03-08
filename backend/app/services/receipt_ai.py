@@ -8,7 +8,7 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 
 
 async def categorize_receipt(text: str) -> dict:
-    model = genai.GenerativeModel("models/gemini-2.0-flash")
+    model = genai.GenerativeModel("models/gemini-2.5-flash")
 
     prompt = f"""You are a financial receipt analyzer.
 
@@ -16,6 +16,13 @@ Extract from the receipt text:
 - category (one of: Food, Entertainment, Transport, Shopping, Health, Others)
 - total amount (a number, e.g. 18.50)
 - transaction type: "income" if money was received, "expense" if money was spent
+
+Rules for finding the total:
+- Prefer the final payment amount.
+- Look for keywords like TOTAL, PAYMENT, AMOUNT, GRAND TOTAL.
+- If the receipt shows "Amount" and "Change", calculate:
+  total = amount_paid - change
+- Ignore invoice line items or subtotals.
 
 Receipt text:
 {text}
