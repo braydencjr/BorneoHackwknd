@@ -1,6 +1,8 @@
+import { BASE_URL } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { useCallback, useState } from "react";
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import CategoryDonut from "../../components/category_donut";
 import DonutProgress from "../../components/donut_progress";
@@ -20,39 +22,60 @@ export default function HomePage() {
   const [containerWidth, setContainerWidth] = useState(0);
   const indicatorPosition = useState(new Animated.Value(0))[0];
 
-  useEffect(() => {
-  fetch("http://10.0.2.2:8000/api/v1/summary")
-    .then(res => res.json())
-    .then(data => {
+  useFocusEffect(
+    useCallback(() => {
+      const fetchData = async () => {
+        try {
+          const token = await SecureStore.getItemAsync("accessToken");
+          if (!token) return;
 
-      const income = Number(data.income) || 0;
-      const outcome = Number(data.outcome) || 0;
+          const res = await fetch(`${BASE_URL}/api/v1/summary/`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
 
-      setIncome(income);
-      setOutcome(outcome);
+          const income = Number(data.income) || 0;
+          const outcome = Number(data.outcome) || 0;
 
-      const total = income + outcome;
+          setIncome(income);
+          setOutcome(outcome);
 
-      const incomePercentage =
-        total > 0 ? (income / total) * 100 : 0;
+          const total = income + outcome;
+          const incomePercentage = total > 0 ? (income / total) * 100 : 0;
+          const outcomePercentage = total > 0 ? (outcome / total) * 100 : 0;
 
-      const outcomePercentage =
-        total > 0 ? (outcome / total) * 100 : 0;
+          setIncomePercentage(incomePercentage);
+          setOutcomePercentage(outcomePercentage);
+          console.log("Summary:", data);
+        } catch (error) {
+          console.error("Failed to fetch summary:", error);
+        }
+      };
 
-      setIncomePercentage(incomePercentage);
-      setOutcomePercentage(outcomePercentage);
+      fetchData();
+    }, [])
+  );
 
-      console.log("Summary:", data);
-    });
-}, []);
+  useFocusEffect(
+    useCallback(() => {
+      const fetchTransactions = async () => {
+        try {
+          const token = await SecureStore.getItemAsync("accessToken");
+          if (!token) return;
 
-  useEffect(() => {
-    fetch("http://10.0.2.2:8000/api/v1/transactions/")
-      .then(res => res.json())
-      .then(data => {
-        setTransactions(data);
-      });
-  }, []);
+          const res = await fetch(`${BASE_URL}/api/v1/transactions/`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          setTransactions(data);
+        } catch (error) {
+          console.error("Failed to fetch transactions:", error);
+        }
+      };
+
+      fetchTransactions();
+    }, [])
+  );
 
   const tabData = {
     A: { percentage: percentage, color: "#7CB518", title: "Income vs Outcome" },
@@ -78,216 +101,216 @@ export default function HomePage() {
   }
 
   const incomeTransactions = transactions.filter(
-  t => t.type === "income"
-);
-
-const incomeTotal = incomeTransactions.reduce(
-  (sum, t) => sum + t.amount,
-  0
-);
-
-const incomeCategories = Object.values(
-  incomeTransactions.reduce((acc: any, t) => {
-
-    if (!acc[t.category]) {
-      acc[t.category] = {
-        category: t.category,
-        amount: 0,
-      };
-    }
-
-    acc[t.category].amount += t.amount;
-
-    return acc;
-
-  }, {})
-).map((c: any) => ({
-  ...c,
-  percentage: incomeTotal > 0 ? (c.amount / incomeTotal) * 100 : 0
-}));
-
-const outcomeTransactions = transactions.filter(
-  t => t.type === "expense"
-);
-
-const outcomeTotal = outcomeTransactions.reduce(
-  (sum, t) => sum + Math.abs(t.amount),
-  0
-);
-
-const outcomeCategories = Object.values(
-  outcomeTransactions.reduce((acc: any, t) => {
-
-    if (!acc[t.category]) {
-      acc[t.category] = {
-        category: t.category,
-        amount: 0,
-      };
-    }
-
-    acc[t.category].amount += Math.abs(t.amount);
-
-    return acc;
-
-  }, {})
-).map((c: any) => ({
-  ...c,
-  percentage: outcomeTotal > 0 ? (c.amount / outcomeTotal) * 100 : 0
-}));
-
-function renderTabContent() {
-
-  // INCOME TAB
-  if (selectedTab === "B") {
-    return (
-      <View style={styles.donutGrid}>
-        {incomeCategories.map((c, index) => (
-          <View key={index} style={styles.donutItem}>
-            <CategoryDonut
-  percentage={Math.round(c.percentage)}
-  color="#22C55E"
-/>
-            <Text style={styles.categoryLabel}>{c.category}</Text>
-
-            <Text style={styles.categoryAmount}>
-              RM{c.amount.toFixed(2)}
-            </Text>
-          </View>
-        ))}
-      </View>
-    );
-  }
-
-  // OUTCOME TAB
-  if (selectedTab === "C") {
-    return (
-      <View style={styles.donutGrid}>
-        {outcomeCategories.map((c, index) => (
-          <View key={index} style={styles.donutItem}>
-            <CategoryDonut
-  percentage={Math.round(c.percentage)}
-  color="#EF4444"
-/>
-
-            <Text style={styles.categoryLabel}>{c.category}</Text>
-
-            <Text style={styles.categoryAmount}>
-              RM{c.amount.toFixed(2)}
-            </Text>
-          </View>
-        ))}
-      </View>
-    );
-  }
-
-  // TRANSACTIONS TAB
-  if (selectedTab === "D") {
-    return (
-      <View>
-        {transactions.map((t) => {
-
-          const isIncome = t.amount > 0;
-
-          return (
-            <View key={t.id} style={styles.transactionRow}>
-
-              <View style={styles.transactionLeft}>
-
-                <View
-                  style={[
-                    styles.transactionIcon,
-                    { backgroundColor: isIncome ? "#E6F9F0" : "#FFECEC" }
-                  ]}
-                >
-                  <Ionicons
-                    name={isIncome ? "arrow-down" : "arrow-up"}
-                    size={16}
-                    color={isIncome ? "#16A34A" : "#DC2626"}
-                  />
-                </View>
-
-                <View>
-                  <Text style={styles.categoryText}>{t.category}</Text>
-
-                  <Text style={styles.merchantName}>
-                    {getMerchantCode(t.merchant_name)}
-                  </Text>
-
-                  <Text style={styles.transactionDate}>
-                    {new Date(t.created_at).toDateString()}
-                  </Text>
-                </View>
-
-              </View>
-
-              <View style={styles.transactionRight}>
-
-                <Text
-                  style={[
-                    styles.transactionAmount,
-                    { color: isIncome ? "#16A34A" : "#DC2626" }
-                  ]}
-                >
-                  {isIncome ? "+" : "-"} RM{Math.abs(t.amount).toFixed(2)}
-                </Text>
-
-                <TouchableOpacity
-                  style={styles.receiptButton}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/receipt",
-                      params: { image: t.receipt_image }
-                    })
-                  }
-                >
-                  <Text style={styles.receiptText}>View</Text>
-                </TouchableOpacity>
-
-              </View>
-
-            </View>
-          );
-        })}
-      </View>
-    );
-  }
-
-  // OVERVIEW TAB (DEFAULT)
-  return (
-    <>
-      <View style={styles.expenseRow}>
-        <View style={{ marginRight: 15 }}>
-          <DonutProgress
-            income={incomePercentage}
-            outcome={outcomePercentage}
-          />
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>Income vs Outcome</Text>
-
-          <Text>• Rent</Text>
-          <Text>• Food</Text>
-          <Text>• Transport</Text>
-        </View>
-      </View>
-
-      <View style={styles.incomeBox}>
-
-        <View style={styles.legendRow}>
-          <View style={[styles.dot, { backgroundColor: "#22C55E" }]} />
-          <Text>Income : RM{income.toFixed(2)}</Text>
-        </View>
-
-        <View style={styles.legendRow}>
-          <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
-          <Text>Outcome : RM{outcome.toFixed(2)}</Text>
-        </View>
-
-      </View>
-    </>
+    t => t.type === "income"
   );
-}
+
+  const incomeTotal = incomeTransactions.reduce(
+    (sum, t) => sum + t.amount,
+    0
+  );
+
+  const incomeCategories = Object.values(
+    incomeTransactions.reduce((acc: any, t) => {
+
+      if (!acc[t.category]) {
+        acc[t.category] = {
+          category: t.category,
+          amount: 0,
+        };
+      }
+
+      acc[t.category].amount += t.amount;
+
+      return acc;
+
+    }, {})
+  ).map((c: any) => ({
+    ...c,
+    percentage: incomeTotal > 0 ? (c.amount / incomeTotal) * 100 : 0
+  }));
+
+  const outcomeTransactions = transactions.filter(
+    t => t.type === "expense"
+  );
+
+  const outcomeTotal = outcomeTransactions.reduce(
+    (sum, t) => sum + Math.abs(t.amount),
+    0
+  );
+
+  const outcomeCategories = Object.values(
+    outcomeTransactions.reduce((acc: any, t) => {
+
+      if (!acc[t.category]) {
+        acc[t.category] = {
+          category: t.category,
+          amount: 0,
+        };
+      }
+
+      acc[t.category].amount += Math.abs(t.amount);
+
+      return acc;
+
+    }, {})
+  ).map((c: any) => ({
+    ...c,
+    percentage: outcomeTotal > 0 ? (c.amount / outcomeTotal) * 100 : 0
+  }));
+
+  function renderTabContent() {
+
+    // INCOME TAB
+    if (selectedTab === "B") {
+      return (
+        <View style={styles.donutGrid}>
+          {incomeCategories.map((c, index) => (
+            <View key={index} style={styles.donutItem}>
+              <CategoryDonut
+                percentage={Math.round(c.percentage)}
+                color="#22C55E"
+              />
+              <Text style={styles.categoryLabel}>{c.category}</Text>
+
+              <Text style={styles.categoryAmount}>
+                RM{c.amount.toFixed(2)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // OUTCOME TAB
+    if (selectedTab === "C") {
+      return (
+        <View style={styles.donutGrid}>
+          {outcomeCategories.map((c, index) => (
+            <View key={index} style={styles.donutItem}>
+              <CategoryDonut
+                percentage={Math.round(c.percentage)}
+                color="#EF4444"
+              />
+
+              <Text style={styles.categoryLabel}>{c.category}</Text>
+
+              <Text style={styles.categoryAmount}>
+                RM{c.amount.toFixed(2)}
+              </Text>
+            </View>
+          ))}
+        </View>
+      );
+    }
+
+    // TRANSACTIONS TAB
+    if (selectedTab === "D") {
+      return (
+        <View>
+          {transactions.map((t) => {
+
+            const isIncome = t.amount > 0;
+
+            return (
+              <View key={t.id} style={styles.transactionRow}>
+
+                <View style={styles.transactionLeft}>
+
+                  <View
+                    style={[
+                      styles.transactionIcon,
+                      { backgroundColor: isIncome ? "#E6F9F0" : "#FFECEC" }
+                    ]}
+                  >
+                    <Ionicons
+                      name={isIncome ? "arrow-down" : "arrow-up"}
+                      size={16}
+                      color={isIncome ? "#16A34A" : "#DC2626"}
+                    />
+                  </View>
+
+                  <View>
+                    <Text style={styles.categoryText}>{t.category}</Text>
+
+                    <Text style={styles.merchantName}>
+                      {getMerchantCode(t.merchant_name)}
+                    </Text>
+
+                    <Text style={styles.transactionDate}>
+                      {new Date(t.created_at).toDateString()}
+                    </Text>
+                  </View>
+
+                </View>
+
+                <View style={styles.transactionRight}>
+
+                  <Text
+                    style={[
+                      styles.transactionAmount,
+                      { color: isIncome ? "#16A34A" : "#DC2626" }
+                    ]}
+                  >
+                    {isIncome ? "+" : "-"} RM{Math.abs(t.amount).toFixed(2)}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.receiptButton}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/receipt",
+                        params: { image: t.receipt_image }
+                      })
+                    }
+                  >
+                    <Text style={styles.receiptText}>View</Text>
+                  </TouchableOpacity>
+
+                </View>
+
+              </View>
+            );
+          })}
+        </View>
+      );
+    }
+
+    // OVERVIEW TAB (DEFAULT)
+    return (
+      <>
+        <View style={styles.expenseRow}>
+          <View style={{ marginRight: 15 }}>
+            <DonutProgress
+              income={incomePercentage}
+              outcome={outcomePercentage}
+            />
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Income vs Outcome</Text>
+
+            <Text>• Rent</Text>
+            <Text>• Food</Text>
+            <Text>• Transport</Text>
+          </View>
+        </View>
+
+        <View style={styles.incomeBox}>
+
+          <View style={styles.legendRow}>
+            <View style={[styles.dot, { backgroundColor: "#22C55E" }]} />
+            <Text>Income : RM{income.toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.legendRow}>
+            <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
+            <Text>Outcome : RM{outcome.toFixed(2)}</Text>
+          </View>
+
+        </View>
+      </>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -485,18 +508,18 @@ const styles = StyleSheet.create({
   },
 
   progressTabs: {
-  position: "absolute",
-  top: -25,   // makes it float into card
-  left: 40,
-  right: 40,
-  flexDirection: "row",
-  justifyContent: "space-between",
-  backgroundColor: "#1E3A8A",
-  padding: 15,
-  borderRadius: 25,
-  elevation: 6,
-  zIndex: 10,
-},
+    position: "absolute",
+    top: -25,   // makes it float into card
+    left: 40,
+    right: 40,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#1E3A8A",
+    padding: 15,
+    borderRadius: 25,
+    elevation: 6,
+    zIndex: 10,
+  },
 
   tabBox: {
     width: 40,
@@ -555,133 +578,133 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E3A8A",
   },
 
-indicator: {
-  position: "absolute",
-  bottom: 6,        // sit near bottom
-  height: 1,        // thin underline
-  backgroundColor: "#FFFFFF",
-  borderRadius: 2,
-},
+  indicator: {
+    position: "absolute",
+    bottom: 6,        // sit near bottom
+    height: 1,        // thin underline
+    backgroundColor: "#FFFFFF",
+    borderRadius: 2,
+  },
 
-tabButton: {
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: 8,
-  zIndex: 2,
-},
+  tabButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    zIndex: 2,
+  },
 
-tabLabel: {
-  fontSize: 11,
-  marginTop: 4,
-  color: "#FFFFFF",
-  textAlign: "center",
-},
+  tabLabel: {
+    fontSize: 11,
+    marginTop: 4,
+    color: "#FFFFFF",
+    textAlign: "center",
+  },
 
-activeTabLabel: {
-  color: "#1E3A8A",
-  fontWeight: "600",
-},
+  activeTabLabel: {
+    color: "#1E3A8A",
+    fontWeight: "600",
+  },
 
-transactionRow: {
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  paddingVertical: 12,
-  borderBottomWidth: 1,
-  borderBottomColor: "#eee",
-},
+  transactionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
 
-transactionLeft: {
-  flexDirection: "row",
-  alignItems: "center",
-},
+  transactionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
 
-transactionRight: {
-  alignItems: "flex-end",
-},
+  transactionRight: {
+    alignItems: "flex-end",
+  },
 
-transactionIcon: {
-  width: 36,
-  height: 36,
-  borderRadius: 18,
-  justifyContent: "center",
-  alignItems: "center",
-  marginRight: 10,
-},
+  transactionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
 
-merchantCode: {
-  fontWeight: "600",
-  fontSize: 15,
-},
+  merchantCode: {
+    fontWeight: "600",
+    fontSize: 15,
+  },
 
-transactionAmount: {
-  fontWeight: "700",
-},
+  transactionAmount: {
+    fontWeight: "700",
+  },
 
-receiptButton: {
-  marginTop: 4,
-  backgroundColor: "#1E3A8A",
-  paddingHorizontal: 8,
-  paddingVertical: 3,
-  borderRadius: 6,
-},
+  receiptButton: {
+    marginTop: 4,
+    backgroundColor: "#1E3A8A",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
 
-receiptText: {
-  fontSize: 10,
-  color: "#fff",
-},
+  receiptText: {
+    fontSize: 10,
+    color: "#fff",
+  },
 
-categoryText: {
-  fontSize: 16,
-  fontWeight: "600",
-},
+  categoryText: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
 
-merchantName: {
-  fontSize: 12,
-  color: "#888",
-  marginTop: 2,
-},
+  merchantName: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 2,
+  },
 
-transactionDate: {
-  fontSize: 12,
-  color: "#999",
-},
+  transactionDate: {
+    fontSize: 12,
+    color: "#999",
+  },
 
-legendRow: {
-  flexDirection: "row",
-  alignItems: "center",
-  marginBottom: 4,
-},
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
 
-dot: {
-  width: 10,
-  height: 10,
-  borderRadius: 5,
-  marginRight: 6,
-},
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
 
-donutGrid: {
-  flexDirection: "row",
-  flexWrap: "wrap",
-  justifyContent: "space-between",
-  marginTop: 10,
-},
+  donutGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
 
-donutItem: {
-  width: "30%",
-  alignItems: "center",
-  marginBottom: 20,
-},
+  donutItem: {
+    width: "30%",
+    alignItems: "center",
+    marginBottom: 20,
+  },
 
-categoryLabel: {
-  marginTop: 6,
-  fontSize: 13,
-  fontWeight: "600",
-},
+  categoryLabel: {
+    marginTop: 6,
+    fontSize: 13,
+    fontWeight: "600",
+  },
 
-categoryAmount: {
-  fontSize: 11,
-  color: "#666",
-},
+  categoryAmount: {
+    fontSize: 11,
+    color: "#666",
+  },
 
 });

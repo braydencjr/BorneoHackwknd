@@ -4,7 +4,7 @@
  * Uses the shared api client (api.ts) which handles token refresh automatically.
  */
 
-import api, { clearTokens, saveTokens } from "./api";
+import api, { BASE_URL, clearTokens, saveTokens } from "./api";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -43,14 +43,11 @@ export const authService = {
       password: payload.password,
     }).toString();
 
-    const res = await fetch(
-      `${(await import("./api")).BASE_URL}/api/v1/auth/login`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formBody,
-      }
-    );
+    const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formBody,
+    });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: "Login failed" }));
@@ -69,25 +66,3 @@ export const authService = {
     await clearTokens();
   },
 };
-
-// ─── Google Login ──────────────────────────────────────────────────────────
-
-export async function loginWithGoogle(idToken: string | undefined) {
-  if (!idToken) return;
-
-  const res = await fetch("http://localhost:3000/auth/google", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      token: idToken,
-    }),
-  });
-
-  const data = await res.json();
-
-  console.log("Backend response:", data);
-
-  return data;
-}

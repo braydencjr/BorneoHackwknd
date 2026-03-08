@@ -1,8 +1,10 @@
+import { BASE_URL } from "@/services/api";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
+import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
-import { Button, Modal, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Button, Modal, Text, View } from "react-native";
 
 export default function ScanPage() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -11,6 +13,7 @@ export default function ScanPage() {
   const [category, setCategory] = useState("");
   const [total, setTotal] = useState(0);
   const [showDialog, setShowDialog] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   if (!permission) return <View />;
 
@@ -25,10 +28,18 @@ export default function ScanPage() {
 
   const processReceipt = async (text: string, uri: string) => {
     try {
-      const response = await fetch("http://10.0.2.2:8000/api/v1/transactions", {
+      setLoading(true);
+      const token = await SecureStore.getItemAsync("accessToken");
+      if (!token) {
+        Alert.alert("Authentication Error", "Please log in again.");
+        return;
+      }
+
+      const response = await fetch(`${BASE_URL}/api/v1/transactions/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           merchant_name: "Receipt",
@@ -40,32 +51,31 @@ export default function ScanPage() {
       const data = await response.json();
       console.log("Backend response:", data);
 
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to process receipt");
+      }
+
       setCategory(data.category);
       setTotal(data.amount);
       setShowDialog(true);
 
-    } catch (err) {
+    } catch (err: any) {
       console.log("Backend processing failed", err);
+      Alert.alert("Error", err.message || "Could not save receipt data.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const uploadReceipt = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-  mediaTypes: ["images"],
-  quality: 0.6,
-});
-
-    if (result.canceled) return;
-
-    const uri = result.assets[0].uri;
-
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: "base64",
-    });
-
-    const apiKey = process.env.EXPO_PUBLIC_VISION_API_KEY;
-
+  const processImage = async (uri: string) => {
+    setLoading(true);
     try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: "base64",
+      });
+
+      const apiKey = process.env.EXPO_PUBLIC_VISION_API_KEY;
+
       const response = await fetch(
         `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
         {
@@ -91,10 +101,32 @@ export default function ScanPage() {
         data.responses?.[0]?.fullTextAnnotation?.text || "No text detected";
 
       await processReceipt(text, uri);
-
     } catch (err) {
       console.log(err);
       alert("OCR failed");
+      setLoading(false);
+    }
+  };
+
+  const uploadFromCamera = async () => {
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 0.6,
+    });
+
+    if (!result.canceled) {
+      await processImage(result.assets[0].uri);
+    }
+  };
+
+  const uploadFromGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.6,
+    });
+
+    if (!result.canceled) {
+      await processImage(result.assets[0].uri);
     }
   };
 
@@ -107,9 +139,9 @@ export default function ScanPage() {
           scanned
             ? undefined
             : ({ data }) => {
-                setScanned(true);
-                alert(`Scanned: ${data}`);
-              }
+              setScanned(true);
+              alert(`Scanned: ${data}`);
+            }
         }
       />
 
@@ -118,9 +150,18 @@ export default function ScanPage() {
           position: "absolute",
           bottom: 50,
           alignSelf: "center",
+          flexDirection: "row",
+          gap: 15,
         }}
       >
-        <Button title="Upload Receipt" onPress={uploadReceipt} />
+        {loading ? (
+          <ActivityIndicator size="large" color="#0000ff" />
+        ) : (
+          <>
+            <Button title="Take Photo" onPress={uploadFromCamera} />
+            <Button title="Open Gallery" onPress={uploadFromGallery} />
+          </>
+        )}
       </View>
 
       {/* Popup dialog */}
