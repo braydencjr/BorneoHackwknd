@@ -35,8 +35,11 @@ async def send_otp(data: OTPRequest):
     otp = generate_otp(email)
     print("DEBUG: /send-otp endpoint called")
     print(f"DEBUG: Generated OTP for {email}: {otp}")
-    send_email(email, otp)
-    print(f"DEBUG: Email sent to {email}")
+    try:
+        send_email(email, otp)
+        print(f"DEBUG: Email sent to {email}")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
     return {"message": "OTP sent"}
 
 @router.post("/verify-otp")
@@ -63,6 +66,9 @@ async def verify_otp_route(
             password=data.password
         )
     )
+
+    from app.services.otp_service import delete_otp
+    delete_otp(email)
 
     return {"message": "User created successfully"}
 

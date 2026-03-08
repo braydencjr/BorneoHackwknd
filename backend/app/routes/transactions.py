@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -12,35 +12,44 @@ from app.models.transactions import Transaction
 
 router = APIRouter(tags=["transactions"])
 
+
 @router.post("/", response_model=TransactionOut)
 async def create_transaction(
     payload: TransactionCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),   # ← correct: in function signature
 ):
-    current_user: User = Depends(get_current_user)
+    try:
+        result = await categorize_receipt(payload.text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI categorization failed: {str(e)}")
 
-    result = await categorize_receipt(payload.text)
-
-    category = result["category"]
-    total = result["total"]
-    transaction_type = result["type"]
+    category = result.get("category", "Others")
+    total = float(result.get("total", 0))
+    transaction_type = result.get("type", "expense")
 
     transaction = await transaction_repository.create(
-    db=db,
-    user_id=current_user.id,
-    merchant_name=payload.merchant_name,
-    amount=total,
-    category=category,
-    type=transaction_type,
-    receipt_image=payload.receipt_image,
-)
+        db=db,
+        user_id=current_user.id,
+        merchant_name=payload.merchant_name,
+        amount=total,
+        category=category,
+        type=transaction_type,
+        receipt_image=payload.receipt_image,
+    )
 
     return transaction
 
+
 @router.get("/")
-async def get_transactions(db: AsyncSession = Depends(get_db)):
-
-    result = await db.execute(select(Transaction).order_by(Transaction.created_at.desc()))
+async def get_transactions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Transaction)
+        .where(Transaction.user_id == current_user.id)
+        .order_by(Transaction.created_at.desc())
+    )
     transactions = result.scalars().all()
-
     return transactions
