@@ -1,15 +1,29 @@
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 export default function Landing() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      router.replace("/loginpage"); // go to login page
+    }, 3000); // 3 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <View style={styles.container}>
       
       {/* Top Gradient Section */}
       <LinearGradient
-        colors={["#0F3D91", "#6E8FBF"]}
-        style={styles.topSection}
-      >
+  colors={["#0F3D91", "#355FB3", "#6E8FBF", "#A9BFE3"]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 0, y: 1 }}
+  style={styles.topSection}
+>
         <View style={styles.circle} />
       </LinearGradient>
 

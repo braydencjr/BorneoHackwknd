@@ -30,7 +30,7 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — never commit ANY .env (they contain secrets)
 .env*.local
 
 # typescript
@@ -45,13 +45,13 @@ app-example
 
 # ── Backend (FastAPI / Python) ────────────────────────────────────────────────
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.so
 *.egg
 *.egg-info/
-dist/
 build/
 .eggs/
 .venv/
@@ -67,11 +67,18 @@ htmlcov/
 .pytest_cache/
 *.log
 
-# SQLite dev database
+# SQLite databases (dev only, never commit)
+*.db
 backend/*.db
-backend/dev.db
 
 # Backend local env
 backend/.env
 
-db-setup/
+# Frontend local env
+frontend/.env
+
+# OTP store (file-backed, contains active OTP codes)
+**/.otp_store.json
+
+# package-lock is fine to commit for reproducibility, but ignore services/ dir if local only
+services/

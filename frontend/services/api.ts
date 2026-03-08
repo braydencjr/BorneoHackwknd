@@ -2,18 +2,29 @@
  * api.ts
  * Centralised HTTP client for the FastAPI backend.
  *
- * Usage:
- *   import api from './api';
- *   const data = await api.get('/health');
- *   const user = await api.post('/auth/register', { email, password, name });
+ * URL Resolution priority:
+ *   1. EXPO_PUBLIC_API_URL in .env  → use it (physical device / custom override)
+ *   2. Android platform             → http://10.0.2.2:8000  (emulator host alias)
+ *   3. Everything else              → http://localhost:8000  (iOS sim / web)
  */
 
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 // ─── Base URL ──────────────────────────────────────────────────────────────
-// Change to your machine LAN IP when testing on a physical device,
-// or use http://10.0.2.2:8000 for the Android emulator.
-const BASE_URL = __DEV__ ? 'http://localhost:8000' : 'https://api.your-domain.com';
+function resolveBaseUrl(): string {
+  // Explicit override (e.g. for physical device testing — set in frontend/.env)
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl && envUrl.trim() !== '') return envUrl.trim();
+
+  if (!__DEV__) return 'https://api.your-domain.com'; // production
+
+  // Dev simulators / emulators
+  if (Platform.OS === 'android') return 'http://10.0.2.2:8000';
+  return 'http://localhost:8000'; // iOS simulator or web
+}
+
+export const BASE_URL = resolveBaseUrl();
 
 const API_PREFIX = '/api/v1';
 
@@ -101,12 +112,11 @@ async function request<T = unknown>(
 
 // ─── Public API ────────────────────────────────────────────────────────────
 const api = {
-  get:    <T = unknown>(path: string)                        => request<T>('GET',    path),
-  post:   <T = unknown>(path: string, body?: unknown)        => request<T>('POST',   path, body),
-  put:    <T = unknown>(path: string, body?: unknown)        => request<T>('PUT',    path, body),
-  patch:  <T = unknown>(path: string, body?: unknown)        => request<T>('PATCH',  path, body),
-  delete: <T = unknown>(path: string)                        => request<T>('DELETE', path),
+  get: <T = unknown>(path: string) => request<T>('GET', path),
+  post: <T = unknown>(path: string, body?: unknown) => request<T>('POST', path, body),
+  put: <T = unknown>(path: string, body?: unknown) => request<T>('PUT', path, body),
+  patch: <T = unknown>(path: string, body?: unknown) => request<T>('PATCH', path, body),
+  delete: <T = unknown>(path: string) => request<T>('DELETE', path),
 };
 
 export default api;
-export { BASE_URL };

@@ -1,9 +1,27 @@
+/**
+ * personalizedsuggestionpage.tsx
+ *
+ * Layout (vertical ScrollView):
+ *  ┌─────────────────────────┐
+ *  │  Title                  │
+ *  │  ← Flashcards →         │
+ *  │  • • • • •              │  dots
+ *  │  Detail panel           │  synced to active card
+ *  │  [ 📋 1 2 3 4 5 ]       │  navigation pill strip
+ *  │  ── Insights ──         │  praise/warning/consequence/tip cards
+ *  └─────────────────────────┘
+ */
+
+import { BASE_URL } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import * as SecureStore from "expo-secure-store";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
+  FlatList,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,534 +29,457 @@ import {
   View,
 } from "react-native";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const { width: SCREEN_W } = Dimensions.get("window");
+const CARD_W = SCREEN_W - 48;
 
-interface AISuggestion {
-  mainSuggestion: string;
-  mainDetail: string;
-  potentialSaving: string;
-  reason: string[];
-  impact: { icon: string; text: string; color: string; bg: string }[];
-  extraTip: string;
-  category: string;
-  generatedAt: string;
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface SuggestionCard {
+  title: string;
+  body: string;
+  icon: string;
+  color: string;
+  detail: string;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+interface InsightCard {
+  type: "praise" | "warning" | "consequence" | "tip";
+  icon: string;
+  title: string;
+  body: string;
+}
 
-const MOCK_SUGGESTION: AISuggestion = {
-  mainSuggestion: "Limit food delivery to 2 times this week.",
-  mainDetail:
-    "You spent RM45 more on food delivery than usual. Cutting back frees up a meaningful buffer for your emergency fund.",
-  potentialSaving: "RM60",
-  category: "🍔 Food & Dining",
-  reason: [
-    "Food delivery spending increased by 28% this week",
-    "Dining is currently your highest spending category",
-    "Your savings rate dropped from 22% to 15% this month",
-  ],
-  impact: [
-    { icon: "cash-outline", text: "Save around RM60 this week", color: "#059669", bg: "#D1FAE5" },
-    { icon: "trending-up-outline", text: "Increase emergency savings by 5%", color: "#2563EB", bg: "#DBEAFE" },
-    { icon: "shield-checkmark-outline", text: "Improve resilience score by 3 pts", color: "#7C3AED", bg: "#EDE9FE" },
-  ],
-  extraTip:
-    "Set a weekly food budget of RM120 using a cash envelope or a dedicated sub-account.",
-  generatedAt: "Today, 8:00 AM",
+interface SummaryData {
+  income: number;
+  outcome: number;
+  top_category: string | null;
+  top_category_amount: number;
+  transaction_count: number;
+  period_days: number;
+}
+
+type Slide =
+  | { type: "header"; summary: SummaryData }
+  | { type: "suggestion"; card: SuggestionCard; index: number };
+
+// ─── Insight theme map ───────────────────────────────────────────────────────
+
+const INSIGHT_THEME: Record<InsightCard["type"], { bg: string; accent: string; icon_bg: string }> = {
+  praise: { bg: "#F0FDF4", accent: "#16A34A", icon_bg: "#DCFCE7" },
+  warning: { bg: "#FFFBEB", accent: "#D97706", icon_bg: "#FEF3C7" },
+  consequence: { bg: "#FFF1F2", accent: "#E11D48", icon_bg: "#FFE4E6" },
+  tip: { bg: "#EFF6FF", accent: "#1D4ED8", icon_bg: "#DBEAFE" },
 };
 
-// ─── Animated fade-in wrapper ─────────────────────────────────────────────────
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
-function FadeIn({
-  children,
-  delay = 0,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-}) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(16)).current;
-
+function SkeletonCard() {
+  const anim = useRef(new Animated.Value(0.45)).current;
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 420,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 420,
-        delay,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0.45, duration: 700, useNativeDriver: true }),
+      ])
+    ).start();
   }, []);
-
   return (
-    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
-      {children}
+    <Animated.View style={[styles.card, styles.skeletonCard, { opacity: anim }]}>
+      <View style={styles.skeletonLine} />
+      <View style={[styles.skeletonLine, { width: "55%", marginTop: 10 }]} />
+      <View style={[styles.skeletonLine, { width: "80%", marginTop: 22 }]} />
+      <View style={[styles.skeletonLine, { width: "65%", marginTop: 8 }]} />
     </Animated.View>
   );
 }
 
-// ─── Daily Suggestion Card ────────────────────────────────────────────────────
+// ─── Dots ─────────────────────────────────────────────────────────────────────
 
-function DailySuggestionCard({ data }: { data: AISuggestion }) {
+function Dots({ count, active }: { count: number; active: number }) {
   return (
-    <FadeIn delay={0}>
-      <LinearGradient
-        colors={["#4F46E5", "#7C3AED", "#A855F7"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.mainCard}
-      >
+    <View style={styles.dotsRow}>
+      {Array.from({ length: count }).map((_, i) => (
+        <View key={i} style={[styles.dot, i === active && styles.dotActive]} />
+      ))}
+    </View>
+  );
+}
 
-        {/* Top Row */}
-        <View style={styles.mainCardHeader}>
-          <View style={styles.bulbBadge}>
-            <Text style={{ fontSize: 14 }}>💡</Text>
-          </View>
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.mainCardLabel}>Today's AI Suggestion</Text>
-            <Text style={styles.mainCardTime}>{data.generatedAt}</Text>
-          </View>
-          <View style={styles.categoryPill}>
-            <Text style={styles.categoryPillText}>{data.category}</Text>
-          </View>
+// ─── Detail panel ─────────────────────────────────────────────────────────────
+
+function DetailPanel({ slide }: { slide: Slide }) {
+  if (slide.type === "header") {
+    const { summary } = slide;
+    const net = summary.income - summary.outcome;
+    return (
+      <View style={styles.detailBox}>
+        <Text style={styles.detailHeading}>30-Day Snapshot</Text>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Income</Text>
+          <Text style={[styles.detailValue, { color: "#16A34A" }]}>RM {summary.income.toFixed(2)}</Text>
         </View>
-
-        {/* Main Text */}
-        <Text style={styles.mainSuggestion}>{data.mainSuggestion}</Text>
-        <Text style={styles.mainDetail}>{data.mainDetail}</Text>
-
-        {/* Saving Row */}
-        <View style={styles.savingRow}>
-          <Ionicons name="cash-outline" size={16} color="#86EFAC" />
-          <Text style={styles.savingText}>
-            Potential saving:{" "}
-            <Text style={styles.savingAmount}>{data.potentialSaving}</Text>
+        <View style={styles.detailRow}>
+          <Text style={styles.detailLabel}>Spent</Text>
+          <Text style={[styles.detailValue, { color: "#DC2626" }]}>RM {summary.outcome.toFixed(2)}</Text>
+        </View>
+        <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
+          <Text style={styles.detailLabel}>Net</Text>
+          <Text style={[styles.detailValue, { color: net >= 0 ? "#16A34A" : "#DC2626" }]}>
+            {net >= 0 ? "+" : ""}RM {Math.abs(net).toFixed(2)}
           </Text>
         </View>
-      </LinearGradient>
-    </FadeIn>
-  );
-}
-
-// ─── Reason Card ──────────────────────────────────────────────────────────────
-
-function SuggestionReason({ reasons }: { reasons: string[] }) {
-  return (
-    <FadeIn delay={120}>
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <LinearGradient colors={["#F97316", "#FB923C"]} style={styles.iconBadge}>
-            <Ionicons name="analytics-outline" size={16} color="#FFF" />
-          </LinearGradient>
-          <Text style={styles.cardTitle}>Why this suggestion?</Text>
-        </View>
-        {reasons.map((r, i) => (
-          <View key={i} style={styles.reasonRow}>
-            <View style={styles.reasonIndex}>
-              <Text style={styles.reasonIndexText}>{i + 1}</Text>
-            </View>
-            <Text style={styles.reasonText}>{r}</Text>
+        {summary.top_category && (
+          <View style={styles.detailChip}>
+            <Text style={styles.detailChipText}>
+              🔝 Biggest spend: <Text style={{ fontWeight: "700" }}>{summary.top_category}</Text>
+              {" · "}RM {summary.top_category_amount.toFixed(2)}
+            </Text>
           </View>
-        ))}
+        )}
       </View>
-    </FadeIn>
+    );
+  }
+  const { card } = slide;
+  return (
+    <View style={[styles.detailBox, { borderLeftWidth: 3, borderLeftColor: card.color }]}>
+      <Text style={styles.detailHeading}>{card.icon}  {card.title}</Text>
+      <Text style={styles.detailBody}>{card.body}</Text>
+      {card.detail ? (
+        <View style={[styles.actionRow, { borderColor: card.color + "33" }]}>
+          <Ionicons name="checkmark-circle" size={15} color={card.color} style={{ marginTop: 1 }} />
+          <Text style={[styles.actionText, { color: card.color }]}>{card.detail}</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
-// ─── Impact Card ──────────────────────────────────────────────────────────────
+// ─── Navigation strip ─────────────────────────────────────────────────────────
 
-function ImpactCard({ impacts }: { impacts: AISuggestion["impact"] }) {
+function NavStrip({
+  slides,
+  active,
+  onPress,
+}: {
+  slides: Slide[];
+  active: number;
+  onPress: (i: number) => void;
+}) {
   return (
-    <FadeIn delay={220}>
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <LinearGradient colors={["#0EA5E9", "#38BDF8"]} style={styles.iconBadge}>
-            <Ionicons name="flash" size={16} color="#FFF" />
-          </LinearGradient>
-          <Text style={styles.cardTitle}>If you follow this</Text>
-        </View>
-        <View style={styles.impactGrid}>
-          {impacts.map((item, i) => (
-            <View
-              key={i}
-              style={[styles.impactChip, { backgroundColor: item.bg }]}
-            >
-              <View style={[styles.impactChipIcon, { backgroundColor: item.color + "22" }]}>
-                <Ionicons name={item.icon as any} size={18} color={item.color} />
-              </View>
-              <Text style={[styles.impactChipText, { color: item.color }]}>
-                {item.text}
-              </Text>
-            </View>
-          ))}
-        </View>
+    <View style={styles.navStrip}>
+      {slides.map((slide, i) => {
+        const isActive = i === active;
+        const label = slide.type === "header" ? "📋" : String(slide.index + 1);
+        const color = slide.type === "suggestion" ? slide.card.color : "#0F3D91";
+        return (
+          <TouchableOpacity
+            key={i}
+            style={[
+              styles.navPill,
+              isActive
+                ? { backgroundColor: color }
+                : { backgroundColor: "#E2E8F0" },
+            ]}
+            onPress={() => onPress(i)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.navPillText, isActive && { color: "#fff" }]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Insight card ─────────────────────────────────────────────────────────────
+
+function InsightCardView({ item }: { item: InsightCard }) {
+  const theme = INSIGHT_THEME[item.type];
+  const label = { praise: "Great news", warning: "Heads up", consequence: "Watch out", tip: "Tip" }[item.type];
+  return (
+    <View style={[styles.insightCard, { backgroundColor: theme.bg }]}>
+      <View style={[styles.insightIconBox, { backgroundColor: theme.icon_bg }]}>
+        <Text style={styles.insightIconText}>{item.icon}</Text>
       </View>
-    </FadeIn>
-  );
-}
-
-// ─── Extra Tip Card ───────────────────────────────────────────────────────────
-
-function ExtraTipCard({ tip }: { tip: string }) {
-  return (
-    <FadeIn delay={320}>
-      <LinearGradient
-        colors={["#FEF3C7", "#FDE68A"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.extraCard}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.starBadge}>
-            <Text style={{ fontSize: 14 }}>⭐</Text>
-          </View>
-          <Text style={styles.extraCardTitle}>Bonus Tip</Text>
+      <View style={{ flex: 1 }}>
+        <View style={styles.insightLabelRow}>
+          <Text style={[styles.insightLabel, { color: theme.accent }]}>{label.toUpperCase()}</Text>
         </View>
-        <Text style={styles.extraTipText}>{tip}</Text>
-      </LinearGradient>
-    </FadeIn>
+        <Text style={styles.insightTitle}>{item.title}</Text>
+        <Text style={styles.insightBody}>{item.body}</Text>
+      </View>
+    </View>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function PersonalizedSuggestionPage() {
-  const [suggestion, setSuggestion] = useState<AISuggestion | null>(null);
+export default function SuggestionPage() {
+  const [slides, setSlides] = useState<Slide[]>([]);
+  const [insights, setInsights] = useState<InsightCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const spinAnim = useRef(new Animated.Value(0)).current;
+  const [error, setError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const flatRef = useRef<FlatList>(null);
 
-  const startSpin = () => {
-    spinAnim.setValue(0);
-    Animated.timing(spinAnim, {
-      toValue: 1,
-      duration: 700,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const load = () => {
+  const fetchSuggestions = async () => {
     setLoading(true);
-    setSuggestion(null);
-    startSpin();
-    // TODO: Replace with real API call to /api/v1/suggestions/daily
-    setTimeout(() => {
-      setSuggestion(MOCK_SUGGESTION);
+    setError(null);
+    try {
+      const token = await SecureStore.getItemAsync("accessToken");
+      const res = await fetch(`${BASE_URL}/api/v1/summary/suggestions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+
+      const items: Slide[] = [
+        { type: "header", summary: data.summary },
+        ...(data.cards as SuggestionCard[]).map(
+          (card, i): Slide => ({ type: "suggestion", card, index: i })
+        ),
+      ];
+      setSlides(items);
+      setInsights(data.insights ?? []);
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load.");
+    } finally {
       setLoading(false);
-    }, 1300);
+    }
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  useEffect(() => { fetchSuggestions(); }, []);
 
-  const spin = spinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
+  const scrollTo = (idx: number) => {
+    flatRef.current?.scrollToIndex({ index: idx, animated: true });
+    setActiveIndex(idx);
+  };
+
+  if (loading) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={{ padding: 24 }}>
+        <Text style={styles.pageTitle}>Your Daily Report</Text>
+        <SkeletonCard />
+        <ActivityIndicator style={{ marginTop: 20 }} color="#1E3A8A" />
+      </ScrollView>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <Ionicons name="cloud-offline-outline" size={52} color="#CBD5E1" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={fetchSuggestions}>
+          <Text style={styles.retryText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const activeSlide = slides[activeIndex] ?? slides[0];
 
   return (
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingBottom: 80 }}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchSuggestions} />}
     >
-      {/* Page Header */}
-      <View style={styles.pageHeader}>
-        <View>
-          <Text style={styles.pageTitle}>Today's Insight</Text>
-          <Text style={styles.pageSubtitle}>Personalised just for you ✨</Text>
-        </View>
-        <TouchableOpacity style={styles.refreshButton} onPress={load} activeOpacity={0.7}>
-          <Animated.View style={{ transform: [{ rotate: spin }] }}>
-            <Ionicons name="refresh-outline" size={20} color="#4F46E5" />
-          </Animated.View>
-        </TouchableOpacity>
-      </View>
+      <Text style={styles.pageTitle}>Your Daily Report</Text>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <LinearGradient
-            colors={["#4F46E5", "#A855F7"]}
-            style={styles.loadingBadge}
-          >
-            <ActivityIndicator color="#FFF" size="small" />
-          </LinearGradient>
-          <Text style={styles.loadingTitle}>Analysing your habits…</Text>
-          <Text style={styles.loadingSubtitle}>
-            Our AI is looking at your recent spending
-          </Text>
-        </View>
-      ) : suggestion ? (
+      {/* ── Flashcards ── */}
+      <FlatList
+        ref={flatRef}
+        data={slides}
+        keyExtractor={(_, i) => String(i)}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        snapToInterval={CARD_W + 16}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        contentContainerStyle={styles.flatContent}
+        nestedScrollEnabled
+        onMomentumScrollEnd={(e) => {
+          const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_W + 16));
+          setActiveIndex(Math.max(0, Math.min(idx, slides.length - 1)));
+        }}
+        renderItem={({ item }) => {
+          if (item.type === "header") {
+            const { summary } = item;
+            const spendPct =
+              summary.income + summary.outcome > 0
+                ? (summary.outcome / (summary.income + summary.outcome)) * 100
+                : 0;
+            return (
+              <View style={styles.cardWrapper}>
+                <View style={[styles.card, { backgroundColor: "#0F3D91" }]}>
+                  <Text style={styles.hEyebrow}>📅  30-Day Report</Text>
+                  <Text style={styles.hBalance}>
+                    RM {(summary.income - summary.outcome).toFixed(2)}
+                  </Text>
+                  <Text style={styles.hBalanceLabel}>Net balance</Text>
+                  <View style={styles.barTrack}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        {
+                          width: `${Math.min(spendPct, 100)}%`,
+                          backgroundColor: spendPct > 80 ? "#F87171" : "#4ADE80",
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={styles.barLabel}>{spendPct.toFixed(0)}% of income spent</Text>
+                  <Text style={styles.hHint}>Swipe for suggestions →</Text>
+                </View>
+              </View>
+            );
+          }
+          const { card, index } = item;
+          const total = slides.filter((s) => s.type === "suggestion").length;
+          return (
+            <View style={styles.cardWrapper}>
+              <View style={[styles.card, { backgroundColor: card.color }]}>
+                <Text style={styles.sCounter}>{index + 1} / {total}</Text>
+                <Text style={styles.sIcon}>{card.icon}</Text>
+                <Text style={styles.sTitle}>{card.title}</Text>
+                <Text style={styles.sBody} numberOfLines={3}>{card.body}</Text>
+              </View>
+            </View>
+          );
+        }}
+      />
+
+      {/* ── Dots ── */}
+      <Dots count={slides.length} active={activeIndex} />
+
+      {/* ── Detail panel ── */}
+      {activeSlide && <DetailPanel slide={activeSlide} />}
+
+      {/* ── Navigation strip ── */}
+      <Text style={styles.navLabel}>Jump to card</Text>
+      <NavStrip slides={slides} active={activeIndex} onPress={scrollTo} />
+
+      {/* ── Insights section ── */}
+      {insights.length > 0 && (
         <>
-          <DailySuggestionCard data={suggestion} />
-          <SuggestionReason reasons={suggestion.reason} />
-          <ImpactCard impacts={suggestion.impact} />
-          <ExtraTipCard tip={suggestion.extraTip} />
+          <Text style={styles.sectionTitle}>Financial Insights</Text>
+          <Text style={styles.sectionSub}>Based on your last 30 days of activity</Text>
+          {insights.map((item, i) => (
+            <InsightCardView key={i} item={item} />
+          ))}
         </>
-      ) : null}
+      )}
+
+      <View style={{ height: 36 }} />
     </ScrollView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F1F5F9",
-    paddingHorizontal: 18,
-  },
+  container: { flex: 1, backgroundColor: "#F1F5F9" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
 
-  // Page header
-  pageHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 24,
-    marginBottom: 20,
-  },
   pageTitle: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#1E1B4B",
-    letterSpacing: -0.5,
-  },
-  pageSubtitle: {
-    fontSize: 13,
-    color: "#94A3B8",
-    marginTop: 3,
-  },
-  refreshButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 2,
-    shadowColor: "#4F46E5",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-  },
-
-  // Loading
-  loadingContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 70,
-  },
-  loadingBadge: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  loadingTitle: {
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: "700",
-    color: "#1E1B4B",
-    marginBottom: 6,
-  },
-  loadingSubtitle: {
-    fontSize: 13,
-    color: "#94A3B8",
-    textAlign: "center",
-  },
-
-  // Main gradient card
-  mainCard: {
-    borderRadius: 24,
-    padding: 22,
+    color: "#0F172A",
+    paddingHorizontal: 24,
+    paddingTop: 20,
     marginBottom: 16,
-    overflow: "hidden",
-    elevation: 8,
-    shadowColor: "#7C3AED",
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 6 },
   },
 
-  mainCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 18,
-  },
-  bulbBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.25)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  mainCardLabel: {
-    fontSize: 12,
-    color: "#C4B5FD",
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-  },
-  mainCardTime: {
-    fontSize: 11,
-    color: "#A78BFA",
-    marginTop: 2,
-  },
-  categoryPill: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  categoryPillText: {
-    color: "#EDE9FE",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  mainSuggestion: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#FFFFFF",
-    lineHeight: 28,
-    marginBottom: 10,
-    letterSpacing: -0.3,
-  },
-  mainDetail: {
-    fontSize: 14,
-    color: "#C4B5FD",
-    lineHeight: 21,
-    marginBottom: 18,
-  },
-  savingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  savingText: {
-    fontSize: 13,
-    color: "#D9F99D",
-  },
-  savingAmount: {
-    fontWeight: "800",
-    color: "#86EFAC",
-  },
-
-  // Shared card
+  // ── FlatList ──
+  flatContent: { paddingHorizontal: 24, gap: 16 },
+  cardWrapper: { width: CARD_W },
   card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 14,
-    elevation: 3,
+    width: CARD_W,
+    borderRadius: 24,
+    padding: 24,
+    minHeight: 200,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-    gap: 10,
-  },
-  iconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: "center",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 14,
+    elevation: 8,
     justifyContent: "center",
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1E1B4B",
   },
 
-  // Reason card
-  reasonRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 10,
-    gap: 10,
-  },
-  reasonIndex: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 1,
-  },
-  reasonIndexText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#4F46E5",
-  },
-  reasonText: {
-    flex: 1,
-    fontSize: 14,
-    color: "#475569",
-    lineHeight: 21,
-  },
+  // Header card
+  hEyebrow: { fontSize: 12, color: "#93C5FD", fontWeight: "600", letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 8 },
+  hBalance: { fontSize: 34, fontWeight: "800", color: "#FFFFFF" },
+  hBalanceLabel: { fontSize: 13, color: "#BFDBFE", marginBottom: 18 },
+  barTrack: { height: 7, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 4, overflow: "hidden", marginBottom: 6 },
+  barFill: { height: 7, borderRadius: 4 },
+  barLabel: { fontSize: 12, color: "#BFDBFE", marginBottom: 14 },
+  hHint: { fontSize: 11, color: "rgba(255,255,255,0.4)", textAlign: "right" },
 
-  // Impact card — grid chips
-  impactGrid: {
-    gap: 10,
-  },
-  impactChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 14,
-    padding: 12,
-    gap: 12,
-  },
-  impactChipIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  impactChipText: {
-    fontSize: 14,
-    fontWeight: "600",
-    flex: 1,
-  },
+  // Suggestion card
+  sCounter: { fontSize: 11, color: "rgba(255,255,255,0.55)", fontWeight: "600", textAlign: "right", marginBottom: 12 },
+  sIcon: { fontSize: 38, marginBottom: 10 },
+  sTitle: { fontSize: 22, fontWeight: "800", color: "#FFFFFF", marginBottom: 8, lineHeight: 28 },
+  sBody: { fontSize: 14, color: "rgba(255,255,255,0.82)", lineHeight: 20 },
 
-  // Extra tip
-  extraCard: {
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 14,
-    elevation: 2,
+  // Dots
+  dotsRow: { flexDirection: "row", justifyContent: "center", gap: 5, marginTop: 14, marginBottom: 4 },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: "#CBD5E1" },
+  dotActive: { width: 18, backgroundColor: "#1E3A8A" },
+
+  // Detail panel
+  detailBox: {
+    marginHorizontal: 24, marginTop: 14,
+    backgroundColor: "#FFFFFF", borderRadius: 18, padding: 18,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  starBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
+  detailHeading: { fontSize: 15, fontWeight: "700", color: "#0F172A", marginBottom: 12 },
+  detailRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
+  detailLabel: { fontSize: 14, color: "#64748B" },
+  detailValue: { fontSize: 14, fontWeight: "700" },
+  detailChip: { backgroundColor: "#F0F4FF", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 12 },
+  detailChipText: { fontSize: 13, color: "#1E3A8A" },
+  detailBody: { fontSize: 14, color: "#475569", lineHeight: 20, marginBottom: 10 },
+  actionRow: {
+    flexDirection: "row", alignItems: "flex-start", gap: 6,
+    backgroundColor: "#F8FAFC", borderRadius: 10, padding: 10,
+    borderWidth: 1,
   },
-  extraCardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#92400E",
+  actionText: { flex: 1, fontSize: 13, lineHeight: 18, fontWeight: "600" },
+
+  // Nav strip
+  navLabel: { fontSize: 12, color: "#94A3B8", fontWeight: "600", textAlign: "center", marginTop: 18, marginBottom: 8, letterSpacing: 0.5, textTransform: "uppercase" },
+  navStrip: { flexDirection: "row", justifyContent: "center", gap: 8, paddingHorizontal: 24 },
+  navPill: {
+    minWidth: 40, height: 40, borderRadius: 20,
+    justifyContent: "center", alignItems: "center", paddingHorizontal: 12,
   },
-  extraTipText: {
-    fontSize: 14,
-    color: "#78350F",
-    lineHeight: 22,
+  navPillText: { fontSize: 14, fontWeight: "700", color: "#64748B" },
+
+  // Insights
+  sectionTitle: { fontSize: 18, fontWeight: "700", color: "#0F172A", paddingHorizontal: 24, marginTop: 28, marginBottom: 2 },
+  sectionSub: { fontSize: 13, color: "#94A3B8", paddingHorizontal: 24, marginBottom: 14 },
+  insightCard: {
+    flexDirection: "row", gap: 14, alignItems: "flex-start",
+    marginHorizontal: 24, marginBottom: 12, borderRadius: 18, padding: 16,
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
   },
+  insightIconBox: { width: 44, height: 44, borderRadius: 22, justifyContent: "center", alignItems: "center" },
+  insightIconText: { fontSize: 22 },
+  insightLabelRow: { flexDirection: "row", marginBottom: 3 },
+  insightLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 1 },
+  insightTitle: { fontSize: 15, fontWeight: "700", color: "#0F172A", marginBottom: 4 },
+  insightBody: { fontSize: 13, color: "#475569", lineHeight: 19 },
+
+  // Skeleton
+  skeletonCard: { backgroundColor: "#E2E8F0", justifyContent: "flex-start" },
+  skeletonLine: { height: 14, borderRadius: 7, backgroundColor: "#CBD5E1", width: "100%" },
+
+  // Error
+  errorText: { color: "#64748B", fontSize: 15, textAlign: "center", paddingHorizontal: 32 },
+  retryBtn: { backgroundColor: "#1E3A8A", paddingHorizontal: 28, paddingVertical: 12, borderRadius: 14 },
+  retryText: { color: "#FFFFFF", fontWeight: "700", fontSize: 15 },
 });
