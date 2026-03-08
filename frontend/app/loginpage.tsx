@@ -2,7 +2,7 @@ import { useGoogleAuth } from "@/services/useGoogleAuth";
 import { AntDesign } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import { authService } from "../services/authService";
 
 export default function Login() {
@@ -56,10 +56,14 @@ export default function Login() {
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
           {/* Logo Circle */}
-          <View style={styles.circle} />
+          <Image
+  source={require("../assets/images/finsight.png")}
+  style={styles.logo}
+  resizeMode="contain"
+/>
 
           {/* App Name */}
-          <Text style={styles.appName}>AppName</Text>
+          <Text style={styles.appName}>FinSight</Text>
 
           {/* Email */}
           <Text style={styles.label}>Email :</Text>
@@ -128,9 +132,9 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
-    paddingTop: 60,
+    paddingTop: 10,
     paddingHorizontal: 30,
     paddingBottom: 40,
   },
@@ -230,4 +234,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
   },
+
+  logo: {
+  width: 170,
+  height: 170,
+  marginBottom: 10,
+},
 });
