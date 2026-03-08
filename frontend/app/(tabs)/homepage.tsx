@@ -3,11 +3,37 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useState } from "react";
-import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import CategoryDonut from "../../components/category_donut";
 import DonutProgress from "../../components/donut_progress";
 
 export default function HomePage() {
+
+  const [user, setUser] = useState<any>(null);
+
+  useFocusEffect(
+  useCallback(() => {
+    const fetchUser = async () => {
+      try {
+        const token = await SecureStore.getItemAsync("accessToken");
+        if (!token) return;
+
+        const res = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const data = await res.json();
+
+        setUser(data);
+
+      } catch (error) {
+        console.error("Failed to fetch user:", error);
+      }
+    };
+
+    fetchUser();
+  }, [])
+);
 
   const router = useRouter();
 
@@ -317,7 +343,14 @@ export default function HomePage() {
 
       {/* Top */}
       <View style={styles.topRow}>
-        <View style={styles.profileCircle} />
+      <Image
+      source={{
+      uri: user?.profile_photo
+      ? `${BASE_URL}/${user.profile_photo}`
+      : "https://cdn-icons-png.flaticon.com/512/847/847969.png",
+  }}
+  style={styles.profileCircle}
+/>
 
         <Text style={styles.healthText}>
           Your Financial Health is Moderate

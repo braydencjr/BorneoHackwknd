@@ -1,6 +1,8 @@
+import shutil
+
 from jose import JWTError
 from app.services.email_service import send_email
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status , UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.otp_service import generate_otp, verify_otp
@@ -11,6 +13,13 @@ from app.core.security import decode_token, create_access_token, create_refresh_
 from app.schemas.user import UserCreate, UserOut, TokenResponse, RefreshRequest
 from app.services.auth_service import auth_service
 from app.dependencies import get_current_user
+
+import shutil
+import os
+
+from app.dependencies import get_current_user
+from app.models.user import User
+from app.core.database import get_db
 
 class OTPVerifyRequest(BaseModel):
     email: str
@@ -98,4 +107,42 @@ async def refresh_token(body: RefreshRequest):
 @router.get("/me", response_model=UserOut)
 async def me(current_user=Depends(get_current_user)):
     return UserOut(email=current_user.email, name=current_user.name)
+
+@router.post("/profile-photo")
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    os.makedirs("uploads", exist_ok=True)
+
+    file_path = f"uploads/user_{current_user.id}.jpg"
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    current_user.profile_photo = file_path
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    return {"profile_photo": file_path}
+
+@router.patch("/update")
+async def update_user(
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if "name" in data:
+        current_user.name = data["name"]
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    return {
+        "name": current_user.name,
+        "email": current_user.email,
+        "profile_photo": current_user.profile_photo
+    }
 
