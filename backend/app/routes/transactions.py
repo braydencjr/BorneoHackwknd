@@ -16,8 +16,8 @@ router = APIRouter(tags=["transactions"])
 async def create_transaction(
     payload: TransactionCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    current_user: User = Depends(get_current_user)
 
     result = await categorize_receipt(payload.text)
 
