@@ -209,7 +209,7 @@ export default function HomePage() {
         <View>
           {transactions.map((t) => {
 
-            const isIncome = t.amount > 0;
+            const isIncome = t.type == "income";
 
             return (
               <View key={t.id} style={styles.transactionRow}>

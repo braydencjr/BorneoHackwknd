@@ -1,7 +1,7 @@
 import { BASE_URL } from "@/services/api";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback } from "react-native";
 
 export default function Register() {
   const router = useRouter();
@@ -74,11 +74,14 @@ export default function Register() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-          {/* Logo Circle */}
-          <View style={styles.circle} />
+           <Image
+            source={require("../assets/images/finsight.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
 
           {/* App Name */}
-          <Text style={styles.appName}>AppName</Text>
+          <Text style={styles.appName}>FinSight</Text>
 
           {/* Username */}
           <Text style={styles.label}>Username :</Text>
@@ -142,9 +145,9 @@ export default function Register() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
-    paddingTop: 70,
+    paddingTop: 20,
     paddingHorizontal: 30,
   },
 
@@ -193,4 +196,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 20,
   },
+
+  logo: {
+  width: 150,
+  height: 150,
+  marginBottom: 10,
+},
 });
