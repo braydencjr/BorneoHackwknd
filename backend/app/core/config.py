@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # Set to False to skip CA verification (needed when CA cert lacks keyUsage extension)
     MYSQL_SSL_VERIFY: bool = False
 
+    EXPO_PUBLIC_API_URL: str | None = None
+    EMAIL_ADDRESS: str | None = None
+    EMAIL_PASSWORD: str | None = None
+
     # Gemini AI — set GEMINI_API_KEY in .env
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.0-flash"

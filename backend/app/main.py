@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.routes import health, auth, resilience
+from app.routes import health, auth, resilience, transactions, summary
 
 settings = get_settings()
 
@@ -51,3 +51,5 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
 app.include_router(auth.router,   prefix="/api/v1/auth",   tags=["auth"])
 app.include_router(resilience.router, prefix="/api/v1/resilience", tags=["resilience"])
+app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
+app.include_router(summary.router, prefix="/api/v1/summary", tags=["summary"])
