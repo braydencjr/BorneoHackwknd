@@ -9,7 +9,7 @@ interface Props {
   strokeWidth?: number;
 }
 
-export default function DonutProgress({
+export default function IncomeOutcomeDonut({
   income,
   outcome,
   size = 140,
@@ -19,25 +19,18 @@ export default function DonutProgress({
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
-  const incomeLength = (income / 100) * circumference;
-  const outcomeLength = (outcome / 100) * circumference;
+  const incomeOffset =
+    circumference - (income / 100) * circumference;
+
+  const outcomeOffset =
+    circumference - (outcome / 100) * circumference;
 
   return (
     <View style={{ width: size, height: size }}>
 
       <Svg width={size} height={size}>
 
-        {/* Background */}
-        <Circle
-          stroke="#E0E0E0"
-          fill="none"
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          strokeWidth={strokeWidth}
-        />
-
-        {/* Outcome (red) */}
+        {/* Outcome ring */}
         <Circle
           stroke="#EF4444"
           fill="none"
@@ -45,12 +38,13 @@ export default function DonutProgress({
           cy={size / 2}
           r={radius}
           strokeWidth={strokeWidth}
-          strokeDasharray={`${outcomeLength} ${circumference}`}
+          strokeDasharray={circumference}
+          strokeDashoffset={outcomeOffset}
           rotation="-90"
           origin={`${size / 2}, ${size / 2}`}
         />
 
-        {/* Income (green) */}
+        {/* Income ring */}
         <Circle
           stroke="#22C55E"
           fill="none"
@@ -58,23 +52,18 @@ export default function DonutProgress({
           cy={size / 2}
           r={radius}
           strokeWidth={strokeWidth}
-          strokeDasharray={`${incomeLength} ${circumference}`}
-          rotation={outcome * 3.6 - 90}
+          strokeDasharray={circumference}
+          strokeDashoffset={incomeOffset}
+          rotation="-90"
           origin={`${size / 2}, ${size / 2}`}
         />
 
       </Svg>
 
-      {/* Center text */}
-     <View style={styles.center}>
-  <Text style={styles.text}>
-    {Math.round(income)}% | {Math.round(outcome)}%
-  </Text>
-
-  <Text style={styles.subText}>
-    Income   Outcome
-  </Text>
-</View>
+      <View style={styles.center}>
+        <Text style={styles.textIncome}>{Math.round(income)}%</Text>
+        <Text style={styles.textOutcome}>{Math.round(outcome)}%</Text>
+      </View>
 
     </View>
   );
@@ -83,19 +72,21 @@ export default function DonutProgress({
 const styles = StyleSheet.create({
   center: {
     position: "absolute",
+    alignItems: "center",
     top: "35%",
     left: 0,
     right: 0,
-    alignItems: "center",
   },
-  text: {
-    fontSize: 20,
+
+  textIncome: {
+    fontSize: 14,
+    color: "#22C55E",
     fontWeight: "600",
   },
 
-  subText: {
-  fontSize: 10,
-  color: "#666",
-  marginTop: 2,
-},
+  textOutcome: {
+    fontSize: 14,
+    color: "#EF4444",
+    fontWeight: "600",
+  },
 });

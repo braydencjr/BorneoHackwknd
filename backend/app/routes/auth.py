@@ -1,13 +1,34 @@
+import shutil
+
 from jose import JWTError
-from fastapi import APIRouter, Depends, HTTPException, status
+from app.services.email_service import send_email
+from fastapi import APIRouter, Depends, HTTPException, status , UploadFile, File
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.otp_service import generate_otp, verify_otp
+from pydantic import BaseModel
 
 from app.core.database import get_db
 from app.core.security import decode_token, create_access_token, create_refresh_token
 from app.schemas.user import UserCreate, UserOut, TokenResponse, RefreshRequest
 from app.services.auth_service import auth_service
 from app.dependencies import get_current_user
+
+import shutil
+import os
+
+from app.dependencies import get_current_user
+from app.models.user import User
+from app.core.database import get_db
+
+class OTPVerifyRequest(BaseModel):
+    email: str
+    otp: str
+    name: str
+    password: str
+
+class OTPRequest(BaseModel):
+    email: str
 
 router = APIRouter()
 
@@ -16,6 +37,49 @@ router = APIRouter()
 async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
     user = await auth_service.register(db, body)
     return UserOut(email=user.email, name=user.name)
+
+@router.post("/send-otp")
+async def send_otp(data: OTPRequest):
+    email = data.email
+    otp = generate_otp(email)
+    print("DEBUG: /send-otp endpoint called")
+    print(f"DEBUG: Generated OTP for {email}: {otp}")
+    try:
+        send_email(email, otp)
+        print(f"DEBUG: Email sent to {email}")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": "OTP sent"}
+
+@router.post("/verify-otp")
+async def verify_otp_route(
+    data: OTPVerifyRequest,
+    db: AsyncSession = Depends(get_db)
+):
+
+    email = data.email
+    otp = data.otp
+
+    print("DEBUG password:", data.password)
+    print("DEBUG length:", len(data.password))
+
+    if not verify_otp(email, otp):
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    # create user AFTER OTP verified
+    user = await auth_service.register(
+        db,
+        UserCreate(
+            email=data.email,
+            name=data.name,
+            password=data.password
+        )
+    )
+
+    from app.services.otp_service import delete_otp
+    delete_otp(email)
+
+    return {"message": "User created successfully"}
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -43,3 +107,42 @@ async def refresh_token(body: RefreshRequest):
 @router.get("/me", response_model=UserOut)
 async def me(current_user=Depends(get_current_user)):
     return UserOut(email=current_user.email, name=current_user.name)
+
+@router.post("/profile-photo")
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    os.makedirs("uploads", exist_ok=True)
+
+    file_path = f"uploads/user_{current_user.id}.jpg"
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    current_user.profile_photo = file_path
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    return {"profile_photo": file_path}
+
+@router.patch("/update")
+async def update_user(
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if "name" in data:
+        current_user.name = data["name"]
+
+    await db.commit()
+    await db.refresh(current_user)
+
+    return {
+        "name": current_user.name,
+        "email": current_user.email,
+        "profile_photo": current_user.profile_photo
+    }
+

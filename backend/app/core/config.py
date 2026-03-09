@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # Set to False to skip CA verification (needed when CA cert lacks keyUsage extension)
     MYSQL_SSL_VERIFY: bool = False
 
+    EXPO_PUBLIC_API_URL: str | None = None
+    EMAIL_ADDRESS: str | None = None
+    EMAIL_PASSWORD: str | None = None
+
+    GEMINI_API_KEY: str | None = None
+
     # LLM — spending analysis (Anthropic Claude or OpenAI GPT)
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "claude-sonnet-4-20250514"

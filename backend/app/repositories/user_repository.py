@@ -24,8 +24,9 @@ class UserRepository:
         email: str,
         name: str,
         hashed_password: str,
+        profile_photo: str | None = None,
     ) -> User:
-        user = User(email=email, name=name, hashed_password=hashed_password)
+        user = User(email=email, name=name, hashed_password=hashed_password,profile_photo=profile_photo,)
         db.add(user)
         await db.flush()        # get the generated id without committing
         await db.refresh(user)

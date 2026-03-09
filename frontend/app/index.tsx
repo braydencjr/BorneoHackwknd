@@ -1,22 +1,53 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useEffect, useRef } from "react";
+import { Animated, Image, StyleSheet, View } from "react-native";
 
 export default function Landing() {
+  const router = useRouter();
+
+  // animation value
+  const slideAnim = useRef(new Animated.Value(-200)).current;
+
+  useEffect(() => {
+    // start animation
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+
+    const timer = setTimeout(() => {
+      router.replace("/loginpage");
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <View style={styles.container}>
       
-      {/* Top Gradient Section */}
-      <LinearGradient
-        colors={["#0F3D91", "#6E8FBF"]}
-        style={styles.topSection}
+      {/* Animated Logo */}
+      <Animated.View
+        style={{
+          transform: [{ translateX: slideAnim }],
+        }}
       >
-        <View style={styles.circle} />
-      </LinearGradient>
+        <Image
+          source={require("../assets/images/finsight.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      </Animated.View>
 
-      {/* Bottom White Section */}
-      <View style={styles.bottomSection}>
-        <Text style={styles.title}>Welcome to AppName</Text>
-      </View>
+      {/* Animated Title */}
+      <Animated.Text
+        style={[
+          styles.title,
+          { transform: [{ translateX: slideAnim }] },
+        ]}
+      >
+        Welcome To FinSight
+      </Animated.Text>
 
     </View>
   );
@@ -25,36 +56,18 @@ export default function Landing() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-
-  topSection: {
-    flex: 2,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  circle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
     backgroundColor: "#FFFFFF",
-    borderWidth: 2,
-    borderColor: "#0F3D91",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  bottomSection: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 20,
+  logo: {
+    width: 280,
+    height: 280,
   },
 
   title: {
     fontSize: 28,
-    fontWeight: "500",
-    textAlign: "center",
+    fontWeight: "600",
   },
 });
