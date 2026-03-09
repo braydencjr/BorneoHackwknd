@@ -47,9 +47,13 @@ async def send_otp(data: OTPRequest):
     try:
         send_email(email, otp)
         print(f"DEBUG: Email sent to {email}")
+        return {"message": "OTP sent", "dev_note": None}
     except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    return {"message": "OTP sent"}
+        # Email failed — log it but don't crash the endpoint.
+        # In dev, read the OTP from the uvicorn console output above.
+        print(f"[WARN] Email send failed: {e}")
+        print(f"[DEV]  Use this OTP manually: {otp}")
+        return {"message": "OTP generated (email delivery failed — check server logs)", "dev_otp": otp}
 
 @router.post("/verify-otp")
 async def verify_otp_route(

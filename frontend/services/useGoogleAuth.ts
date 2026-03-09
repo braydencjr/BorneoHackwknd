@@ -18,12 +18,18 @@ WebBrowser.maybeCompleteAuthSession();
  * In Expo Go (development), only the web clientId is required.
  */
 export function useGoogleAuth() {
+  const webClientId =
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+    null;
+
+  // Always call the hook (React rules) — use a placeholder when no real client ID
+  // is configured so the hook doesn't throw. The button is hidden when !isConfigured.
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
-      ?? process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID, // fallback to existing key
+    clientId: webClientId ?? "not-configured",
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
   });
 
-  return { request, response, promptAsync };
+  return { request, response, promptAsync, isConfigured: !!webClientId };
 }

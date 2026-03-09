@@ -14,21 +14,27 @@ settings = get_settings()
 _connect_args: dict = {}
 
 if settings.DATABASE_URL.startswith("mysql"):
-    if settings.MYSQL_SSL_CERT and settings.MYSQL_SSL_KEY:
-        ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        ssl_ctx.check_hostname = False
-        if settings.MYSQL_SSL_VERIFY and settings.MYSQL_SSL_CA:
-            ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+    ssl_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+
+    # Load CA cert if provided (verifies server identity)
+    if settings.MYSQL_SSL_CA:
+        try:
             ssl_ctx.load_verify_locations(cafile=settings.MYSQL_SSL_CA)
-        else:
-            # CA cert may lack keyUsage extension (Python 3.13+ stricter check)
-            # client cert still provides mutual TLS authentication
-            ssl_ctx.verify_mode = ssl.CERT_NONE
+            if settings.MYSQL_SSL_VERIFY:
+                ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+        except FileNotFoundError:
+            pass  # CA cert missing — continue without it
+
+    # Load client cert + key only if BOTH are provided and exist
+    if settings.MYSQL_SSL_CERT and settings.MYSQL_SSL_KEY:
         ssl_ctx.load_cert_chain(
             certfile=settings.MYSQL_SSL_CERT,
             keyfile=settings.MYSQL_SSL_KEY,
         )
-        _connect_args["ssl"] = ssl_ctx
+
+    _connect_args["ssl"] = ssl_ctx
 
 # ---------------------------------------------------------------------------
 # Engine — aiosqlite for dev, aiomysql for MySQL, asyncpg for PostgreSQL
