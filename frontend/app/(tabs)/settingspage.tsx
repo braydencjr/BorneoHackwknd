@@ -1,11 +1,16 @@
-import { BASE_URL } from "@/services/api";
+import { authService } from "@/services/authService";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useFocusEffect, useRouter } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-
+import {
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -15,43 +20,35 @@ export default function SettingsPage() {
   const [darkMode, setDarkMode] = useState(false);
 
   useFocusEffect(
-  useCallback(() => {
-    fetchUser();
-  }, [])
-);
+    useCallback(() => {
+      fetchUser();
+    }, []),
+  );
 
   const fetchUser = async () => {
-  try {
-    const token = await SecureStore.getItemAsync("accessToken");
-console.log("TOKEN:", token);
-
-    const response = await fetch(`${BASE_URL}/api/v1/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    const data = await response.json();
-
-    setUser(data);
-
-  } catch (error) {
-    console.log("Failed to load user:", error);
-  }
-};
+    try {
+      const data = await authService.me();
+      if (!data) {
+        router.replace("/loginpage");
+        return;
+      }
+      setUser(data);
+    } catch (error) {
+      console.log("Failed to load user:", error);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
-
       {/* Profile Card */}
       <View style={styles.profileCard}>
-  <View style={styles.avatar} />
+        <View style={styles.avatar} />
 
-  <View>
-    <Text style={styles.name}>{user?.name || "Loading..."}</Text>
-    <Text style={styles.email}>{user?.email || ""}</Text>
-  </View>
-</View>
+        <View>
+          <Text style={styles.name}>{user?.name || "Loading..."}</Text>
+          <Text style={styles.email}>{user?.email || ""}</Text>
+        </View>
+      </View>
 
       {/* Preferences Section */}
       <Text style={styles.sectionTitle}>Preferences</Text>
@@ -88,17 +85,17 @@ console.log("TOKEN:", token);
       <Text style={styles.sectionTitle}>Account</Text>
 
       <View style={styles.card}>
-       <TouchableOpacity
-  style={styles.row}
-  onPress={() => router.push("/editProfile")}
->
-  <View style={styles.rowLeft}>
-    <Ionicons name="person-outline" size={20} color="#1E3A8A" />
-    <Text style={styles.rowText}>Edit Profile</Text>
-  </View>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => router.push("/editProfile")}
+        >
+          <View style={styles.rowLeft}>
+            <Ionicons name="person-outline" size={20} color="#1E3A8A" />
+            <Text style={styles.rowText}>Edit Profile</Text>
+          </View>
 
-  <Ionicons name="chevron-forward" size={18} color="#999" />
-</TouchableOpacity>
+          <Ionicons name="chevron-forward" size={18} color="#999" />
+        </TouchableOpacity>
 
         <View style={styles.divider} />
 
@@ -115,15 +112,12 @@ console.log("TOKEN:", token);
         <TouchableOpacity style={styles.row}>
           <View style={styles.rowLeft}>
             <Ionicons name="log-out-outline" size={20} color="#E4572E" />
-            <Text style={[styles.rowText, { color: "#E4572E" }]}>
-              Log Out
-            </Text>
+            <Text style={[styles.rowText, { color: "#E4572E" }]}>Log Out</Text>
           </View>
         </TouchableOpacity>
       </View>
 
       <View style={{ height: 60 }} />
-
     </ScrollView>
   );
 }
@@ -133,7 +127,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F5",
     paddingHorizontal: 20,
-    padding : 20,
+    padding: 20,
   },
 
   profileCard: {

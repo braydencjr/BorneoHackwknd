@@ -37,13 +37,21 @@ app = FastAPI(
 # CORS — allow Expo web (localhost:19006) and your dev machine LAN IP.
 # Tighten allow_origins in production to your real domain only.
 # ---------------------------------------------------------------------------
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_origins = settings.ALLOWED_ORIGINS
+cors_kwargs = {
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+
+# `*` + credentials can behave inconsistently across clients/browsers.
+# Use regex wildcard when "allow all" is requested.
+if "*" in cors_origins:
+    cors_kwargs["allow_origin_regex"] = ".*"
+else:
+    cors_kwargs["allow_origins"] = cors_origins
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # ---------------------------------------------------------------------------
 # Routers — all endpoints live under /api/v1 for versioning

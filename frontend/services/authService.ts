@@ -58,8 +58,15 @@ export const authService = {
     await saveTokens(access_token, refresh_token);
   },
 
-  async me(): Promise<UserProfile> {
-    return api.get<UserProfile>("/auth/me");
+  async me(): Promise<UserProfile | null> {
+    try {
+      return await api.get<UserProfile>("/auth/me");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Session expired")) {
+        return null;
+      }
+      throw error;
+    }
   },
 
   async logout(): Promise<void> {
