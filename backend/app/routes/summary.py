@@ -90,7 +90,7 @@ def _compute_insights(s: dict) -> list[dict]:
             "title": "Losing money each month",
             "body": (
                 f"You're RM{shortfall:.2f} short this period. "
-                "If this continues for 6 months, that's RM{shortfall * 6:.0f} drawn from savings or credit."
+                f"If this continues for 6 months, that's RM{shortfall * 6:.0f} drawn from savings or credit."
             ),
         })
 
@@ -119,12 +119,9 @@ def _compute_insights(s: dict) -> list[dict]:
             "icon": "🧾",
             "title": f"{count} transactions in {period} days",
             "body": (
-                f"That's {per_day:.1f} transactions a day. "
-                "More frequent buyers tend to overspend on small impulse purchases — "
-                "try batching purchases to once a day."
+                f"That's {per_day:.1f} transactions a day — frequent buyers tend to overspend on small impulse purchases. Try batching to once a day."
                 if per_day >= 2 else
-                f"That's {per_day:.1f} per day — a well-controlled pace. "
-                "Stay aware of where each one goes."
+                f"That's {per_day:.1f} per day — a well-controlled pace. Stay aware of where each one goes."
             ),
         })
 
