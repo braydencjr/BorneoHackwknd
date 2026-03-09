@@ -1,5 +1,6 @@
 import { authService } from "@/services/authService";
 import { Ionicons } from "@expo/vector-icons";
+import * as SecureStore from "expo-secure-store";
 
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
@@ -18,10 +19,13 @@ export default function SettingsPage() {
   const [user, setUser] = useState<any>(null);
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [notificationConsent, setNotificationConsent] =
+    useState<string>("not-set");
 
   useFocusEffect(
     useCallback(() => {
       fetchUser();
+      fetchConsentStatus();
     }, []),
   );
 
@@ -36,6 +40,11 @@ export default function SettingsPage() {
     } catch (error) {
       console.log("Failed to load user:", error);
     }
+  };
+
+  const fetchConsentStatus = async () => {
+    const value = await SecureStore.getItemAsync("notificationConsentV1");
+    setNotificationConsent(value ?? "not-set");
   };
 
   return (
@@ -65,6 +74,28 @@ export default function SettingsPage() {
             trackColor={{ true: "#1E3A8A" }}
           />
         </View>
+
+        <View style={styles.divider} />
+
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => router.push("/notification-consent")}
+        >
+          <View style={styles.rowLeft}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={20}
+              color="#1E3A8A"
+            />
+            <Text style={styles.rowText}>Notification Data Consent</Text>
+          </View>
+          <View style={styles.rowRight}>
+            <Text style={styles.statusText}>
+              {notificationConsent === "granted" ? "Granted" : "Not granted"}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color="#999" />
+          </View>
+        </TouchableOpacity>
 
         <View style={styles.divider} />
 
@@ -188,6 +219,17 @@ const styles = StyleSheet.create({
   rowText: {
     fontSize: 16,
     marginLeft: 10,
+  },
+
+  rowRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  statusText: {
+    fontSize: 12,
+    color: "#666",
   },
 
   divider: {
