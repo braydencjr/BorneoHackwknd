@@ -93,8 +93,9 @@ class SpendingAnalysisService:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self.api_key: str = settings.LLM_API_KEY
-        self.model: str = settings.LLM_MODEL
+        self.gemini_api_key: str = settings.GEMINI_API_KEY
+        self.claude_api_key: str = settings.CLAUDE_API_KEY
+        self.model: str = settings.GEMINI_MODEL
 
     # ----- public interface ------------------------------------------------
 
@@ -105,8 +106,10 @@ class SpendingAnalysisService:
         try:
             if self._is_openai():
                 raw = await self._call_openai(user_message)
-            else:
+            elif self._is_claude():
                 raw = await self._call_anthropic(user_message)
+            else:
+                raw = await self._call_gemini(user_message)
             return self._parse_response(raw)
         except Exception as e:
             logger.exception("LLM spending-analysis call failed")
@@ -132,15 +135,28 @@ class SpendingAnalysisService:
 
     # ----- internals -------------------------------------------------------
 
+    def _is_claude(self) -> bool:
+        return "claude" in self.model.lower()
+
     def _is_openai(self) -> bool:
         return "gpt" in self.model.lower() or "o1" in self.model.lower() or "o3" in self.model.lower()
+
+    async def _call_gemini(self, user_message: str) -> str:
+        import google.generativeai as genai
+        genai.configure(api_key=self.gemini_api_key)
+        model = genai.GenerativeModel(
+            model_name=self.model,
+            system_instruction=SYSTEM_PROMPT,
+        )
+        response = model.generate_content(user_message)
+        return response.text
 
     async def _call_anthropic(self, user_message: str) -> str:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
-                    "x-api-key": self.api_key,
+                    "x-api-key": self.claude_api_key,
                     "anthropic-version": "2023-06-01",
                     "content-type": "application/json",
                 },
@@ -160,7 +176,7 @@ class SpendingAnalysisService:
             resp = await client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {self.api_key}",
+                    "Authorization": f"Bearer {self.gemini_api_key}",
                     "Content-Type": "application/json",
                 },
                 json={
