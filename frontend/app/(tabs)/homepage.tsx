@@ -492,7 +492,9 @@ export default function HomePage() {
                 style={styles.insightCard}
               >
                 <Ionicons
-                  name={insight.isPositive ? "checkmark-circle" : "close-circle"}
+                  name={
+                    insight.isPositive ? "checkmark-circle" : "close-circle"
+                  }
                   size={18}
                   color={insight.isPositive ? "#16A34A" : "#DC2626"}
                 />
