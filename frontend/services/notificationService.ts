@@ -6,11 +6,12 @@
  *   - Check / request Notification Access permission
  *   - Listen for incoming TNG eWallet notifications
  *   - Forward notification content to the backend for AI classification
+ *   - Show local notifications prompting user to record transactions
  */
 
 import * as SecureStore from "expo-secure-store";
 import { NativeEventEmitter, NativeModules, Platform } from "react-native";
-import api from "./api";
+import api, { BASE_URL } from "./api";
 
 // ─── Native module types ──────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ interface TngNotificationNativeModule {
     "oem_background" | "battery_optimization" | "app_details" | "none"
   >;
   requestNotificationListenerRebind(): Promise<boolean>;
+  syncCredentials(accessToken: string, apiUrl: string): Promise<boolean>;
 }
 
 export interface TngNotificationPayload {
@@ -137,8 +139,7 @@ export function subscribeTngNotifications(
 
 /**
  * Send captured notification text to backend for Gemini AI classification.
- * If classified as outgoing payment or incoming money, the backend
- * automatically records it as a transaction.
+ * The backend auto-records the transaction if it's not "general".
  */
 export async function classifyNotification(
   title: string,
@@ -148,4 +149,23 @@ export async function classifyNotification(
     title,
     text,
   });
+}
+
+/**
+ * Sync the access token and API URL to SharedPreferences so the Kotlin
+ * NotificationListenerService can call the backend API even when the
+ * React Native app is not running.
+ */
+export async function syncCredentials(): Promise<void> {
+  const mod = getNativeModule();
+  if (!mod) return;
+
+  const token = await SecureStore.getItemAsync("accessToken");
+  if (!token) {
+    console.log("[syncCredentials] No access token — skipping");
+    return;
+  }
+
+  await mod.syncCredentials(token, BASE_URL);
+  console.log("[syncCredentials] Credentials synced to native layer");
 }

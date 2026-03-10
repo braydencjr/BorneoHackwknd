@@ -1,21 +1,21 @@
 import {
-    DarkTheme,
-    DefaultTheme,
-    ThemeProvider,
+  DarkTheme,
+  DefaultTheme,
+  ThemeProvider,
 } from "@react-navigation/native";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { PermissionsAndroid, Platform } from "react-native";
 import "react-native-reanimated";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
-    classifyNotification,
-    hasConsent,
-    isNotificationAccessEnabled,
-    subscribeTngNotifications,
-    type TngNotificationPayload,
+  hasConsent,
+  isNotificationAccessEnabled,
+  subscribeTngNotifications,
+  syncCredentials,
+  type TngNotificationPayload,
 } from "@/services/notificationService";
 
 export default function RootLayout() {
@@ -49,7 +49,26 @@ export default function RootLayout() {
     };
   }, [router, segments]);
 
-  // Background TNG notification listener (Android only)
+  // Sync credentials to native layer so Kotlin service can call API independently
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    (async () => {
+      // Request POST_NOTIFICATIONS permission on Android 13+
+      if (Number(Platform.Version) >= 33) {
+        await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        );
+      }
+
+      await syncCredentials();
+    })().catch((err) =>
+      console.warn("[Layout] Failed to sync credentials:", err),
+    );
+  }, []);
+
+  // Background TNG notification listener (Android only) — just log in JS,
+  // the Kotlin service handles API calls and native notifications directly.
   useEffect(() => {
     if (Platform.OS !== "android") return;
 
@@ -60,17 +79,10 @@ export default function RootLayout() {
       if (!consentGranted) return;
 
       unsubscribe = subscribeTngNotifications(
-        async (data: TngNotificationPayload) => {
-          try {
-            const result = await classifyNotification(data.title, data.text);
-            if (result.recorded) {
-              console.log(
-                `[TNG] Recorded ${result.classification}: RM${result.amount} at ${result.merchant_name}`,
-              );
-            }
-          } catch (err) {
-            console.warn("[TNG] Failed to classify notification:", err);
-          }
+        (data: TngNotificationPayload) => {
+          console.log(
+            `[TNG] Notification received: "${data.title}" — "${data.text}"`,
+          );
         },
       );
     })();
@@ -92,6 +104,11 @@ export default function RootLayout() {
         <Stack.Screen
           name="notification-consent"
           options={{ title: "Notification Consent" }}
+        />
+
+        <Stack.Screen
+          name="add-transaction"
+          options={{ title: "Record Transaction" }}
         />
 
         <Stack.Screen

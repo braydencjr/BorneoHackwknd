@@ -26,7 +26,7 @@ class NotificationClassifyResponse(BaseModel):
 
 
 @router.post("/classify", response_model=NotificationClassifyResponse)
-async def classify_and_record(
+async def classify_notification_endpoint(
     payload: NotificationClassifyRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -34,7 +34,7 @@ async def classify_and_record(
     """
     Classify a TNG eWallet notification using Gemini AI.
     If it's an outgoing payment or incoming money, automatically record
-    it as a transaction in the user's account.
+    it as a transaction.
     """
     try:
         result = await classify_notification(payload.title, payload.text)
@@ -45,19 +45,16 @@ async def classify_and_record(
 
     classification = result["classification"]
 
-    # General / promotional → return without recording
     if classification == "general":
         return NotificationClassifyResponse(
             classification="general",
             recorded=False,
         )
 
-    # Outgoing payment or incoming money → record as transaction
     amount = result.get("amount") or 0.0
     merchant_name = result.get("merchant_name") or "TNG eWallet"
     category = result.get("category") or "Others"
     description = result.get("description") or ""
-
     transaction_type = "expense" if classification == "outgoing_payment" else "income"
 
     await transaction_repository.create(
@@ -67,7 +64,7 @@ async def classify_and_record(
         amount=amount,
         category=category,
         type=transaction_type,
-        receipt_image="",  # no image for notification-based transactions
+        receipt_image="",
     )
 
     return NotificationClassifyResponse(

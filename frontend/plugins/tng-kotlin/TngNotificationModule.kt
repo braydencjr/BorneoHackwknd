@@ -1,6 +1,7 @@
 package com.borneohackwknd.app
 
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -14,6 +15,7 @@ import com.facebook.react.modules.core.DeviceEventManagerModule
  *   1. Checks / opens Notification Access settings
  *   2. Receives TNG notification data from TngNotificationListenerService
  *   3. Emits events to the JS layer via DeviceEventEmitter
+ *   4. Syncs auth credentials so the listener service can call the API independently
  */
 class TngNotificationModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
@@ -21,6 +23,9 @@ class TngNotificationModule(reactContext: ReactApplicationContext) :
     companion object {
         private const val TAG = "TngNotifModule"
         private const val EVENT_NAME = "onTngNotification"
+        const val PREFS_NAME = "TngNotifPrefs"
+        const val KEY_ACCESS_TOKEN = "accessToken"
+        const val KEY_API_URL = "apiUrl"
 
         // Singleton reference so the NotificationListenerService can emit
         private var moduleInstance: TngNotificationModule? = null
@@ -207,6 +212,27 @@ class TngNotificationModule(reactContext: ReactApplicationContext) :
             }
         } catch (e: Exception) {
             promise.reject("ERR_REBIND", e.message, e)
+        }
+    }
+
+    /**
+     * Save the access token and API URL to SharedPreferences so the
+     * NotificationListenerService can call the backend API independently
+     * (even when the JS layer is not running).
+     */
+    @ReactMethod
+    fun syncCredentials(accessToken: String, apiUrl: String, promise: Promise) {
+        try {
+            reactApplicationContext
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_ACCESS_TOKEN, accessToken)
+                .putString(KEY_API_URL, apiUrl)
+                .apply()
+            Log.d(TAG, "Credentials synced to SharedPreferences")
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERR_SYNC_CREDS", e.message, e)
         }
     }
 

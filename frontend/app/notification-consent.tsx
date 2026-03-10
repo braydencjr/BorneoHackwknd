@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
     AppState,
+    PermissionsAndroid,
     Platform,
     ScrollView,
     StyleSheet,
@@ -56,6 +57,14 @@ export default function NotificationConsentScreen() {
   const handleGrant = async () => {
     await setConsent(true);
     setConsentGranted(true);
+
+    // Request POST_NOTIFICATIONS runtime permission (Android 13+)
+    if (Platform.OS === "android" && Number(Platform.Version) >= 33) {
+      await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+      );
+    }
+
     await checkStatus();
   };
 
