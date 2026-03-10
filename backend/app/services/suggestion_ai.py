@@ -13,6 +13,7 @@ _FALLBACK = [
         "icon": "📊",
         "color": "#1E3A8A",
         "detail": "Open this app after every purchase and scan your receipt immediately.",
+        "isPositive": True,
     },
     {
         "title": "Set a weekly limit",
@@ -20,6 +21,7 @@ _FALLBACK = [
         "icon": "🎯",
         "color": "#065F46",
         "detail": "Decide your cap now and set a phone reminder to check it mid-week.",
+        "isPositive": False,
     },
     {
         "title": "Check subscriptions",
@@ -27,6 +29,7 @@ _FALLBACK = [
         "icon": "🔄",
         "color": "#92400E",
         "detail": "Go to your bank app and filter by recurring payments to spot them quickly.",
+        "isPositive": False,
     },
     {
         "title": "Pay yourself first",
@@ -34,6 +37,7 @@ _FALLBACK = [
         "icon": "💰",
         "color": "#4C1D95",
         "detail": "Set up an auto-transfer to your savings account on the day you get paid.",
+        "isPositive": True,
     },
     {
         "title": "Review tomorrow",
@@ -41,6 +45,7 @@ _FALLBACK = [
         "icon": "📅",
         "color": "#7F1D1D",
         "detail": "Scan at least 3 receipts today so tomorrow's report is based on your real data.",
+        "isPositive": True,
     },
 ]
 
@@ -103,16 +108,17 @@ Rules:
 - body: 1-2 sentences max. Reference their actual numbers. Be direct, not generic.
 - detail: 1 short sentence — one concrete action they can do TODAY.
 - title: 3-5 words max.
+- isPositive: boolean. true when the insight indicates healthy/good behavior; false when it indicates risky/negative behavior.
 - icon: a single relevant emoji.
 - color: one of these hex codes only: #1E3A8A, #065F46, #92400E, #4C1D95, #9D174D
 
 Return ONLY valid JSON array, no markdown, no explanation:
 [
-  {{"title": "...", "body": "...", "icon": "...", "color": "...", "detail": "..."}},
-  {{"title": "...", "body": "...", "icon": "...", "color": "...", "detail": "..."}},
-  {{"title": "...", "body": "...", "icon": "...", "color": "...", "detail": "..."}},
-  {{"title": "...", "body": "...", "icon": "...", "color": "...", "detail": "..."}},
-  {{"title": "...", "body": "...", "icon": "...", "color": "...", "detail": "..."}}
+    {{"title": "...", "body": "...", "isPositive": true, "icon": "...", "color": "...", "detail": "..."}},
+    {{"title": "...", "body": "...", "isPositive": false, "icon": "...", "color": "...", "detail": "..."}},
+    {{"title": "...", "body": "...", "isPositive": false, "icon": "...", "color": "...", "detail": "..."}},
+    {{"title": "...", "body": "...", "isPositive": true, "icon": "...", "color": "...", "detail": "..."}},
+    {{"title": "...", "body": "...", "isPositive": true, "icon": "...", "color": "...", "detail": "..."}}
 ]"""
 
     try:
@@ -137,6 +143,7 @@ Return ONLY valid JSON array, no markdown, no explanation:
                 valid.append({
                     "title": str(item["title"]),
                     "body": str(item["body"]),
+                    "isPositive": bool(item.get("isPositive", False)),
                     "icon": str(item["icon"]),
                     "color": str(item["color"]),
                     "detail": str(item.get("detail", "")),

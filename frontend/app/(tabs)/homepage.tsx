@@ -23,6 +23,7 @@ export default function HomePage() {
     {
       title: string;
       body: string;
+      isPositive: boolean;
     }[]
   >([]);
 
@@ -145,6 +146,7 @@ export default function HomePage() {
             .map((card: any) => ({
               title: card.title || "AI Spending Insight",
               body: String(card.body),
+              isPositive: Boolean(card.isPositive),
             }));
 
           setAiInsights(cards);
@@ -489,7 +491,11 @@ export default function HomePage() {
                 key={`${insight.title}-${index}`}
                 style={styles.insightCard}
               >
-                <Text style={styles.insightIcon}>🤖</Text>
+                <Ionicons
+                  name={insight.isPositive ? "checkmark-circle" : "close-circle"}
+                  size={18}
+                  color={insight.isPositive ? "#16A34A" : "#DC2626"}
+                />
                 <Text style={styles.insightText}>
                   {insight.title}: {insight.body}
                 </Text>
