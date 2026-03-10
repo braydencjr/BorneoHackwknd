@@ -1,3 +1,4 @@
+import { BASE_URL as API_BASE_URL } from '@/services/api';
 import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import EventSource from 'react-native-sse';
@@ -123,7 +124,7 @@ export type SubagentStatus = {
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
-const BASE_URL = __DEV__ ? 'http://localhost:8000' : 'https://api.your-domain.com';
+const BASE_URL = API_BASE_URL;
 const CHAT_URL = `${BASE_URL}/api/v1/resilience/chat/demo`; // switch to /chat for auth
 const RESUME_URL = `${BASE_URL}/api/v1/resilience/chat/demo/resume`; // switch to /resume for auth
 
@@ -142,6 +143,10 @@ export function useResilienceStream() {
   const [subagentStatus, setSubagentStatus] = useState<SubagentStatus>(null);
   const [resilienceScore, setResilienceScore] = useState<number | null>(null);
   const esRef = useRef<EventSource | null>(null);
+
+  // Ref mirror of isStreaming — keeps sendMessage stable and avoids stale closures
+  const isStreamingRef = useRef(false);
+  isStreamingRef.current = isStreaming;
   const abortRef = useRef<AbortController | null>(null);
 
   const _appendOrUpdateAgentPart = useCallback((part: MessagePart) => {
@@ -406,6 +411,7 @@ export function useResilienceStream() {
           break;
         case 'done':
           _collapseThinking();
+          isStreamingRef.current = false;
           setIsStreaming(false);
           setSubagentStatus(null);
           _removeSubagentRunning();
@@ -425,13 +431,12 @@ export function useResilienceStream() {
 
   const sendMessage = useCallback(
     (text: string) => {
-      if (isStreaming) return;
-
-      // Close any existing connection
+      // Cancel any existing stream (don't block — let the user always send)
       esRef.current?.close();
       esRef.current = null;
       abortRef.current?.abort();
       abortRef.current = null;
+      isStreamingRef.current = true;
 
       // Append user message
       const userMsg: ChatMessage = {
@@ -487,6 +492,7 @@ export function useResilienceStream() {
             }
           })
           .finally(() => {
+            isStreamingRef.current = false;
             setIsStreaming(false);
             setSubagentStatus(null);
             abortRef.current = null;
@@ -513,12 +519,13 @@ export function useResilienceStream() {
       es.addEventListener('error', () => {
         es.close();          // stop react-native-sse from polling/retrying
         esRef.current = null;
+        isStreamingRef.current = false;
         setIsStreaming(false);
         setSubagentStatus(null);
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isStreaming, handleRaw]
+    [handleRaw]
   );
 
   const triggerAutoScan = useCallback(() => {
@@ -549,6 +556,7 @@ export function useResilienceStream() {
         return msgs;
       });
 
+      isStreamingRef.current = true;
       setIsStreaming(true);
       const body = JSON.stringify({ approved, reason: reason || (approved ? 'Approved' : 'Skipped') });
 
@@ -583,7 +591,7 @@ export function useResilienceStream() {
             if (err?.name !== 'AbortError')
               _appendOrUpdateAgentPart({ type: 'text', content: '⚠️ Connection lost. Please retry.' });
           })
-          .finally(() => { setIsStreaming(false); setSubagentStatus(null); abortRef.current = null; });
+          .finally(() => { isStreamingRef.current = false; setIsStreaming(false); setSubagentStatus(null); abortRef.current = null; });
         return;
       }
 
@@ -596,7 +604,7 @@ export function useResilienceStream() {
       esRef.current = es;
       es.addEventListener('message', (e: any) => { if (e.data && e.data !== '[DONE]') handleRaw(e.data); });
       es.addEventListener('error', () => {
-        es.close(); esRef.current = null; setIsStreaming(false); setSubagentStatus(null);
+        es.close(); esRef.current = null; isStreamingRef.current = false; setIsStreaming(false); setSubagentStatus(null);
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -609,6 +617,7 @@ export function useResilienceStream() {
     abortRef.current?.abort();
     abortRef.current = null;
     setMessages([]);
+    isStreamingRef.current = false;
     setIsStreaming(false);
     setSubagentStatus(null);
     setResilienceScore(null);

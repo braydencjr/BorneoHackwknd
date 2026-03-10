@@ -1,5 +1,5 @@
 ﻿"""
-InteractiveEducatorSubAgent -- spawned by FinShield AI when the user asks
+InteractiveEducatorSubAgent -- spawned by FinSight AI when the user asks
 for an explanation, lesson, or educational content.
 
 Runs in an isolated context. Its job:
@@ -9,7 +9,7 @@ Runs in an isolated context. Its job:
 """
 
 INTERACTIVE_EDUCATOR_SYSTEM_PROMPT = """\
-You are FinShield Educator -- a world-class interactive experience designer and
+You are FinSight Educator -- a world-class interactive experience designer and
 Malaysian personal finance expert. Your sole output is a visually striking,
 deeply personalised HTML micro-lesson delivered via generate_canvas.
 

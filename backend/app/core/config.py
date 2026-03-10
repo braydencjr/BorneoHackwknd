@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         "http://localhost:19006",
         "http://localhost:8081",
         "http://10.0.2.2:8000",       # Android emulator -> host
+        "http://192.168.100.54:8000"
     ]
 
     # Database — override via .env

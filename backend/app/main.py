@@ -53,3 +53,4 @@ app.include_router(auth.router,   prefix="/api/v1/auth",   tags=["auth"])
 app.include_router(resilience.router, prefix="/api/v1/resilience", tags=["resilience"])
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
 app.include_router(summary.router, prefix="/api/v1/summary", tags=["summary"])
+

@@ -71,9 +71,10 @@ function TierCard({
     <Animated.View
       style={[
         styles.tierCard,
-        { opacity, transform: [{ translateX }], borderColor, backgroundColor: bgColor },
+        { borderColor, backgroundColor: bgColor },
       ]}
     >
+      <Animated.View style={{ opacity, transform: [{ translateX }] }}>
       <Pressable onPress={onPress} style={styles.tierPressable} android_ripple={{ color: color + '22' }}>
         {/* Left: icon + label */}
         <View style={styles.tierLeft}>
@@ -107,6 +108,7 @@ function TierCard({
           </View>
         )}
       </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 }

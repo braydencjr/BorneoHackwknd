@@ -83,8 +83,6 @@ export default function EmergencyAlertCard({ data }: Props) {
       style={[
         styles.card,
         {
-          opacity: cardOpacity,
-          transform: [{ scale: cardScale }],
           borderColor,
           backgroundColor: cfg.bg,
           shadowOpacity,
@@ -92,46 +90,48 @@ export default function EmergencyAlertCard({ data }: Props) {
         },
       ]}
     >
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <Animated.Text style={[styles.iconLarge, { transform: [{ scale: iconPulse }] }]}>
-          {cfg.icon}
-        </Animated.Text>
-        <Animated.View style={{ transform: [{ translateX: titleShake }] }}>
-          <Text style={[styles.urgencyLabel, { color: cfg.color }]}>{cfg.label}</Text>
-          <Text style={styles.urgencySubLabel}>Emergency Fund Critical</Text>
-        </Animated.View>
-        <View style={[styles.urgencyBand, { backgroundColor: cfg.color }]}>
-          <Text style={styles.urgencyBandText}>{data.urgency.toUpperCase()}</Text>
-        </View>
-      </View>
-
-      {/* Savings gap */}
-      <View style={[styles.gapBox, { borderColor: cfg.color + '33' }]}>
-        <Text style={styles.gapLabel}>SAVINGS GAP</Text>
-        <Text style={[styles.gapValue, { color: cfg.color }]}>
-          RM{data.savings_gap.toLocaleString()}
-        </Text>
-        <Text style={styles.gapSub}>needed to reach safety threshold</Text>
-      </View>
-
-      {/* Action bullets */}
-      <View style={styles.actionsSection}>
-        <Text style={styles.actionsHeading}>IMMEDIATE ACTIONS</Text>
-        {data.action_bullets.map((bullet, i) => (
-          <Animated.View key={i} style={[styles.bulletRow, { opacity: bulletOpacities[i] ?? 1 }]}>
-            <View style={[styles.bulletDot, { backgroundColor: cfg.color }]} />
-            <Text style={styles.bulletText}>{bullet}</Text>
+      <Animated.View style={{ opacity: cardOpacity, transform: [{ scale: cardScale }] }}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <Animated.Text style={[styles.iconLarge, { transform: [{ scale: iconPulse }] }]}>
+            {cfg.icon}
+          </Animated.Text>
+          <Animated.View style={{ transform: [{ translateX: titleShake }] }}>
+            <Text style={[styles.urgencyLabel, { color: cfg.color }]}>{cfg.label}</Text>
+            <Text style={styles.urgencySubLabel}>Emergency Fund Critical</Text>
           </Animated.View>
-        ))}
-      </View>
+          <View style={[styles.urgencyBand, { backgroundColor: cfg.color }]}>
+            <Text style={styles.urgencyBandText}>{data.urgency.toUpperCase()}</Text>
+          </View>
+        </View>
 
-      {/* Bottom accent */}
-      <View style={[styles.bottomAccent, { backgroundColor: cfg.color + '22' }]}>
-        <Text style={[styles.bottomAccentText, { color: cfg.color }]}>
-          Act now — every month of delay costs more to recover from.
-        </Text>
-      </View>
+        {/* Savings gap */}
+        <View style={[styles.gapBox, { borderColor: cfg.color + '33' }]}>
+          <Text style={styles.gapLabel}>SAVINGS GAP</Text>
+          <Text style={[styles.gapValue, { color: cfg.color }]}>
+            RM{data.savings_gap.toLocaleString()}
+          </Text>
+          <Text style={styles.gapSub}>needed to reach safety threshold</Text>
+        </View>
+
+        {/* Action bullets */}
+        <View style={styles.actionsSection}>
+          <Text style={styles.actionsHeading}>IMMEDIATE ACTIONS</Text>
+          {data.action_bullets.map((bullet, i) => (
+            <Animated.View key={i} style={[styles.bulletRow, { opacity: bulletOpacities[i] ?? 1 }]}>
+              <View style={[styles.bulletDot, { backgroundColor: cfg.color }]} />
+              <Text style={styles.bulletText}>{bullet}</Text>
+            </Animated.View>
+          ))}
+        </View>
+
+        {/* Bottom accent */}
+        <View style={[styles.bottomAccent, { backgroundColor: cfg.color + '22' }]}>
+          <Text style={[styles.bottomAccentText, { color: cfg.color }]}>
+            Act now — every month of delay costs more to recover from.
+          </Text>
+        </View>
+      </Animated.View>
     </Animated.View>
   );
 }

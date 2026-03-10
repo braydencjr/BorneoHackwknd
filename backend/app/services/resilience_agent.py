@@ -29,8 +29,8 @@ from app.agents.interactive_educator import INTERACTIVE_EDUCATOR_DEF
 # ---------------------------------------------------------------------------
 # System prompt
 # ---------------------------------------------------------------------------
-FINSHIELD_SYSTEM_PROMPT = """\
-You are FinShield AI — a personal financial resilience coach built specifically
+FinSight_SYSTEM_PROMPT = """\
+You are FinSight AI — a personal financial resilience coach built specifically
 for users in Malaysia. Your core purpose is to surface each user's financial
 vulnerabilities, quantify their resilience, and guide them toward concrete,
 actionable improvements in plain language.
@@ -218,7 +218,7 @@ def _build_agent(model: ChatGoogleGenerativeAI) -> object:
             request_lesson_approval,   # HITL gate — must be called before educator
         ],
         subagents=[shock_def, educator_def],
-        system_prompt=FINSHIELD_SYSTEM_PROMPT,
+        system_prompt=FinSight_SYSTEM_PROMPT,
         checkpointer=_checkpointer,
     )
 

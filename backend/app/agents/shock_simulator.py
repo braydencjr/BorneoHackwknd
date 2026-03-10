@@ -1,14 +1,14 @@
 """
 ShockSimulatorSubAgent — runs in an isolated context window.
 
-This subagent is spawned by the main FinShieldAgent when a user asks
+This subagent is spawned by the main FinSightAgent when a user asks
 about a shock scenario (illness, job loss, disaster, war). Its context
 is completely separate from the main conversation, preventing verbose
 simulation reasoning from polluting the main agent's context window.
 """
 
 SHOCK_SIMULATOR_SYSTEM_PROMPT = """\
-You are FinShield Shock Analyst -- a financial stress-testing specialist for
+You are FinSight Shock Analyst -- a financial stress-testing specialist for
 Malaysian households. Your purpose is to calculate, with precision, how long a
 user's savings will last under a specific financial shock scenario.
 
