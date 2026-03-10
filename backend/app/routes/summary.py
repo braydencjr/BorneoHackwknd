@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from collections import defaultdict
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -146,18 +147,65 @@ async def _build_spending_summary(db: AsyncSession, user: User, days: int = 30) 
     outcome = 0.0
     by_category: dict[str, float] = {}
     merchant_counts: dict[str, int] = {}
+    monthly_outcome: dict[str, float] = defaultdict(float)
+    fixed_categories = {"rent", "utilities", "subscription", "insurance", "loan", "installment", "bill", "mortgage"}
+    bnpl_keywords = {
+        "bnpl",
+        "installment",
+        "spaylater",
+        "atome",
+        "split",
+        "hoolah",
+        "paylater",
+        "grab paylater",
+        "shopee paylater",
+        "akulaku",
+        "kredivo",
+    }
+
+    fixed_expense = 0.0
+    flexible_expense = 0.0
+    bnpl_expense = 0.0
+    bnpl_count = 0
 
     for t in transactions:
         if t.type == "income":
             income += t.amount
         else:
             outcome += abs(t.amount)
-            by_category[t.category] = by_category.get(t.category, 0) + abs(t.amount)
+            amount = abs(t.amount)
+            by_category[t.category] = by_category.get(t.category, 0) + amount
+
+            month_key = t.created_at.strftime("%Y-%m")
+            monthly_outcome[month_key] += amount
+
+            category_text = (t.category or "").lower()
+            merchant_text = (t.merchant_name or "").lower()
+            haystack = f"{category_text} {merchant_text}"
+
+            is_fixed = any(keyword in category_text for keyword in fixed_categories)
+            if is_fixed:
+                fixed_expense += amount
+            else:
+                flexible_expense += amount
+
+            if any(keyword in haystack for keyword in bnpl_keywords):
+                bnpl_expense += amount
+                bnpl_count += 1
 
         if t.merchant_name:
             merchant_counts[t.merchant_name] = merchant_counts.get(t.merchant_name, 0) + 1
 
     top_merchant = max(merchant_counts, key=merchant_counts.get) if merchant_counts else None
+
+    monthly_series = [
+        {"month": month, "amount": amt}
+        for month, amt in sorted(monthly_outcome.items())
+    ][-6:]
+
+    fixed_pct = (fixed_expense / outcome * 100) if outcome > 0 else 0.0
+    flexible_pct = (flexible_expense / outcome * 100) if outcome > 0 else 0.0
+    bnpl_pct = (bnpl_expense / outcome * 100) if outcome > 0 else 0.0
 
     return {
         "income": income,
@@ -166,6 +214,14 @@ async def _build_spending_summary(db: AsyncSession, user: User, days: int = 30) 
         "top_merchant": top_merchant,
         "period_days": days,
         "transaction_count": len(transactions),
+        "monthly_outcome": monthly_series,
+        "fixed_expense": fixed_expense,
+        "flexible_expense": flexible_expense,
+        "fixed_expense_pct": fixed_pct,
+        "flexible_expense_pct": flexible_pct,
+        "bnpl_expense": bnpl_expense,
+        "bnpl_count": bnpl_count,
+        "bnpl_expense_pct": bnpl_pct,
     }
 
 
@@ -230,6 +286,14 @@ async def get_suggestions(
                 if summary["by_category"] else 0,
             "transaction_count": summary["transaction_count"],
             "period_days": summary["period_days"],
+            "monthly_outcome": summary["monthly_outcome"],
+            "fixed_expense": summary["fixed_expense"],
+            "flexible_expense": summary["flexible_expense"],
+            "fixed_expense_pct": summary["fixed_expense_pct"],
+            "flexible_expense_pct": summary["flexible_expense_pct"],
+            "bnpl_expense": summary["bnpl_expense"],
+            "bnpl_count": summary["bnpl_count"],
+            "bnpl_expense_pct": summary["bnpl_expense_pct"],
         },
         "cards": cards,
         "insights": insights,

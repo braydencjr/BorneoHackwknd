@@ -58,26 +58,47 @@ async def generate_suggestions(spending_summary: dict) -> list[dict]:
     Returns a list of 5 dicts: { title, body, icon, color }
     """
     categories = spending_summary.get("by_category", {})
-    income = spending_summary.get("income", 0)
     outcome = spending_summary.get("outcome", 0)
     period = spending_summary.get("period_days", 30)
+    monthly_outcome = spending_summary.get("monthly_outcome", [])
+    fixed_expense = spending_summary.get("fixed_expense", 0)
+    flexible_expense = spending_summary.get("flexible_expense", 0)
+    fixed_pct = spending_summary.get("fixed_expense_pct", 0)
+    flexible_pct = spending_summary.get("flexible_expense_pct", 0)
+    bnpl_expense = spending_summary.get("bnpl_expense", 0)
+    bnpl_count = spending_summary.get("bnpl_count", 0)
+    bnpl_pct = spending_summary.get("bnpl_expense_pct", 0)
 
-    if not categories and income == 0 and outcome == 0:
+    if not categories and outcome == 0:
         return _FALLBACK
 
     cat_lines = "\n".join(
         f"  - {cat}: RM{amt:.2f}" for cat, amt in sorted(categories.items(), key=lambda x: -x[1])
     )
 
+    monthly_lines = "\n".join(
+        f"  - {item['month']}: RM{float(item['amount']):.2f}" for item in monthly_outcome
+    ) or "  - No monthly trend available"
+
     prompt = f"""You are a concise, no-nonsense personal finance coach.
 
 Here is the user's last {period} days of financial data:
-- Total income: RM{income:.2f}
 - Total spending: RM{outcome:.2f}
+- Monthly spending trend (latest months):
+{monthly_lines}
 - Spending by category:
 {cat_lines}
+- Fixed expenses: RM{fixed_expense:.2f} ({fixed_pct:.1f}%)
+- Flexible expenses: RM{flexible_expense:.2f} ({flexible_pct:.1f}%)
+- BNPL/deferred-payment spending: RM{bnpl_expense:.2f} across {bnpl_count} transaction(s) ({bnpl_pct:.1f}%)
 
 Generate exactly 5 short financial suggestion cards for this specific person.
+Card focus rules:
+- Card 1 MUST analyze spending pattern over time using the monthly trend.
+- Card 2 MUST analyze fixed vs flexible expense structure.
+- Card 3 MUST highlight high-risk behavior, especially BNPL/deferred payments when present.
+- Card 4 and 5 can be additional spending behavior insights.
+- Do not use income-based ratio framing (for example, do not say "X% of income"). Focus on spending behavior and risk patterns.
 Rules:
 - body: 1-2 sentences max. Reference their actual numbers. Be direct, not generic.
 - detail: 1 short sentence — one concrete action they can do TODAY.
