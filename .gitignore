@@ -81,4 +81,4 @@ frontend/.env
 **/.otp_store.json
 
 # package-lock is fine to commit for reproducibility, but ignore services/ dir if local only
-services/
+/services/
