@@ -1,10 +1,9 @@
-import asyncio
 import json
-import google.generativeai as genai
+from google import genai
 from app.core.config import get_settings
 
 settings = get_settings()
-genai.configure(api_key=settings.GEMINI_API_KEY)
+client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 # Fallback cards if Gemini fails
 _FALLBACK = [
@@ -96,10 +95,8 @@ Return ONLY valid JSON array, no markdown, no explanation:
 ]"""
 
     try:
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None, lambda: model.generate_content(prompt)
+        response = await client.aio.models.generate_content(
+            model="gemini-2.5-flash", contents=prompt
         )
 
         clean = response.text.strip()

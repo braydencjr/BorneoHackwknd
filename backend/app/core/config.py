@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         "http://localhost:19006",
         "http://localhost:8081",
         "http://10.0.2.2:8000",       # Android emulator -> host
+        "http://192.168.100.54:8000"
     ]
 
     # Database — override via .env
@@ -39,7 +40,13 @@ class Settings(BaseSettings):
     EMAIL_ADDRESS: str | None = None
     EMAIL_PASSWORD: str | None = None
 
-    GEMINI_API_KEY: str | None = None
+    # Gemini AI — set GEMINI_API_KEY in .env
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # Anthropic Claude — optional; used for educator subagent if set
+    CLAUDE_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-sonnet-4-6"
 
     model_config = ConfigDict(
         env_file=".env",

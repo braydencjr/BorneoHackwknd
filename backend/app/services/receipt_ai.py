@@ -1,15 +1,12 @@
-import asyncio
 import json
-import google.generativeai as genai
+from google import genai
 from app.core.config import get_settings
 
 settings = get_settings()
-genai.configure(api_key=settings.GEMINI_API_KEY)
+_client = genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
 async def categorize_receipt(text: str) -> dict:
-    model = genai.GenerativeModel("models/gemini-2.5-flash")
-
     prompt = f"""You are a financial receipt analyzer.
 
 Extract from the receipt text:
@@ -35,10 +32,9 @@ Return ONLY valid JSON with these exact keys, no markdown, no explanation:
 }}"""
 
     try:
-        # google-generativeai is sync under the hood — run in executor to not block event loop
-        loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None, lambda: model.generate_content(prompt)
+        response = await _client.aio.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
         )
 
         clean = response.text.strip()
