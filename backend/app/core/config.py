@@ -1,5 +1,5 @@
 from functools import lru_cache
-
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -41,10 +41,11 @@ class Settings(BaseSettings):
 
     GEMINI_API_KEY: str | None = None
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"   # ignore extra env variables like EXPO_PUBLIC_*
+    )
 
 @lru_cache
 def get_settings() -> Settings:
