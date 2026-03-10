@@ -181,7 +181,6 @@ async def stream_agent_response(
     Event shapes:
       {"type":"text","content":"..."}
       {"type":"thinking","state":"start"|"stop"}
-      {"type":"step","label":"Analyzing your finances…"}
       {"type":"tool_call","tool":"display_vitals","state":"running"}
       {"type":"tool_call","tool":"display_vitals","state":"done"}
       {"type":"tool_result","tool":"display_vitals","data":{...}}
@@ -208,6 +207,7 @@ async def stream_agent_response(
 
     emitted_any_text = False
     thinking_active = False
+    _text_buf: list = []  # buffer text tokens per LLM pass to suppress pre-tool preamble
     try:
         async for event in agent.astream_events(
             {"messages": enriched},
@@ -221,11 +221,13 @@ async def stream_agent_response(
             if event_type == "on_chat_model_start":
                 meta = event.get("metadata", {})
                 checkpoint_ns = meta.get("langgraph_checkpoint_ns", "")
-                if "tools:" not in checkpoint_ns and not thinking_active:
-                    thinking_active = True
-                    yield _sse({"type": "thinking", "state": "start"})
+                if "tools:" not in checkpoint_ns:
+                    _text_buf = []  # reset buffer for each new root-level LLM pass
+                    if not thinking_active:
+                        thinking_active = True
+                        yield _sse({"type": "thinking", "state": "start"})
 
-            # ---- streaming text tokens ----
+            # ---- streaming text tokens (buffer — flushed on LLM end) ----
             elif event_type == "on_chat_model_stream":
                 meta = event.get("metadata", {})
                 checkpoint_ns = meta.get("langgraph_checkpoint_ns", "")
@@ -236,29 +238,38 @@ async def stream_agent_response(
                         if isinstance(content, list):
                             for block in content:
                                 if isinstance(block, dict) and block.get("type") == "text":
-                                    emitted_any_text = True
-                                    yield _sse({"type": "text", "content": block["text"]})
+                                    _text_buf.append(block["text"])
                         elif isinstance(content, str) and content:
-                            emitted_any_text = True
-                            yield _sse({"type": "text", "content": content})
+                            _text_buf.append(content)
 
             # ---- LLM finished a generation pass ----
             elif event_type == "on_chat_model_end":
                 meta = event.get("metadata", {})
                 checkpoint_ns = meta.get("langgraph_checkpoint_ns", "")
-                if "tools:" not in checkpoint_ns and thinking_active:
-                    thinking_active = False
-                    yield _sse({"type": "thinking", "state": "stop"})
+                if "tools:" not in checkpoint_ns:
+                    output = event["data"].get("output")
+                    has_tool_calls = bool(
+                        output and hasattr(output, "tool_calls") and output.tool_calls
+                    )
+                    if has_tool_calls:
+                        # Tool-calling pass — discard buffered preamble text
+                        _text_buf.clear()
+                    else:
+                        # Final response pass — flush buffered text
+                        for token in _text_buf:
+                            if token:
+                                emitted_any_text = True
+                                yield _sse({"type": "text", "content": token})
+                        _text_buf.clear()
+                        if thinking_active:
+                            thinking_active = False
+                            yield _sse({"type": "thinking", "state": "stop"})
 
             # ---- tool about to run ----
             elif event_type == "on_tool_start":
                 meta = event.get("metadata", {})
                 checkpoint_ns = meta.get("langgraph_checkpoint_ns", "")
                 is_in_subagent = "tools:" in checkpoint_ns
-
-                # Emit a human-readable step label for all tool starts (root-level)
-                if not is_in_subagent and name in _TOOL_STEP_LABELS:
-                    yield _sse({"type": "step", "tool": name, "label": _TOOL_STEP_LABELS[name]})
 
                 if name in _SUBAGENT_TOOLS:
                     inp = event["data"].get("input", {})
@@ -367,6 +378,7 @@ async def resume_agent_response(
     config = {"configurable": {"thread_id": user_id}, "recursion_limit": 100}
     decision = {"approved": approved, "reason": reason or ("Approved" if approved else "Skipped")}
 
+    _text_buf: list = []  # buffer text tokens per LLM pass to suppress pre-tool preamble
     try:
         async for event in agent.astream_events(
             Command(resume=decision),
@@ -379,7 +391,11 @@ async def resume_agent_response(
             checkpoint_ns = meta.get("langgraph_checkpoint_ns", "")
             is_in_subagent = "tools:" in checkpoint_ns
 
-            if event_type == "on_chat_model_stream":
+            if event_type == "on_chat_model_start":
+                if "tools:" not in checkpoint_ns:
+                    _text_buf = []  # reset buffer for each new root-level LLM pass
+
+            elif event_type == "on_chat_model_stream":
                 if "tools:" not in checkpoint_ns:
                     chunk = event["data"].get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
@@ -387,9 +403,23 @@ async def resume_agent_response(
                         if isinstance(content, list):
                             for block in content:
                                 if isinstance(block, dict) and block.get("type") == "text":
-                                    yield _sse({"type": "text", "content": block["text"]})
+                                    _text_buf.append(block["text"])
                         elif isinstance(content, str) and content:
-                            yield _sse({"type": "text", "content": content})
+                            _text_buf.append(content)
+
+            elif event_type == "on_chat_model_end":
+                if "tools:" not in checkpoint_ns:
+                    output = event["data"].get("output")
+                    has_tool_calls = bool(
+                        output and hasattr(output, "tool_calls") and output.tool_calls
+                    )
+                    if has_tool_calls:
+                        _text_buf.clear()
+                    else:
+                        for token in _text_buf:
+                            if token:
+                                yield _sse({"type": "text", "content": token})
+                        _text_buf.clear()
 
             elif event_type == "on_tool_start":
                 if name in _SUBAGENT_TOOLS:

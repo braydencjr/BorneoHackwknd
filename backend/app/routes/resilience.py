@@ -5,6 +5,7 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.resilience import ChatRequest, ResumeRequest
 from app.services.resilience_agent import stream_agent_response, resume_agent_response
+from app.services.overview_agent import stream_overview_response
 
 router = APIRouter()
 
@@ -57,6 +58,39 @@ async def resilience_demo_resume(req: ResumeRequest):
     """Resume a HITL-interrupted demo agent run (no auth)."""
     return StreamingResponse(
         resume_agent_response(req.approved, req.reason, "demo_user"),
+        media_type="text/event-stream",
+        headers=_SSE_HEADERS,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Overview endpoints — stateless single-shot daily health scan.
+# No request body required: user_id is implicit (demo) or from auth token.
+# ---------------------------------------------------------------------------
+
+@router.post("/overview/demo")
+async def resilience_overview_demo():
+    """
+    One-shot daily overview scan for the demo user.
+    Runs the stateless overview agent: vitals → score → alert (if critical) → plan,
+    then streams an AI-authored plain-English analysis of each metric.
+    No auth, no conversation history.
+    """
+    return StreamingResponse(
+        stream_overview_response("demo_user"),
+        media_type="text/event-stream",
+        headers=_SSE_HEADERS,
+    )
+
+
+@router.post("/overview")
+async def resilience_overview(current_user: User = Depends(get_current_user)):
+    """
+    One-shot daily overview scan for the authenticated user.
+    Same as /overview/demo but uses the real user's profile.
+    """
+    return StreamingResponse(
+        stream_overview_response(str(current_user.id)),
         media_type="text/event-stream",
         headers=_SSE_HEADERS,
     )

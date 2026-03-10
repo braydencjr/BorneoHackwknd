@@ -201,6 +201,8 @@ export function useResilienceStream() {
 
   // Ref mirror of isStreaming — keeps sendMessage stable and avoids stale closures
   const isStreamingRef = useRef(false);
+  // Track whether a subagent is currently running; used to suppress subagent text
+  const subagentRunningRef = useRef(false);
   isStreamingRef.current = isStreaming;
   const abortRef = useRef<AbortController | null>(null);
 
@@ -315,6 +317,8 @@ export function useResilienceStream() {
       if (!last || last.role !== 'agent') return prev;
       const parts = last.parts.map((p) => {
         if (p.type === 'thinking') {
+          // Dedup: skip if a step for this tool is already running (prevents duplicate spinners)
+          if (p.steps.some((s) => s.tool === tool && s.status === 'running')) return p;
           const newStep: ThinkingStep = {
             id: stepUid(),
             tool,
@@ -339,6 +343,7 @@ export function useResilienceStream() {
       if (!last || last.role !== 'agent') return prev;
       const parts = last.parts.map((p) => {
         if (p.type === 'thinking') {
+          // Mark ALL running steps for this tool as done (guards against any residual duplicates)
           const steps = p.steps.map((s) =>
             s.tool === tool && s.status === 'running' ? { ...s, status: 'done' as const } : s
           );
@@ -405,9 +410,13 @@ export function useResilienceStream() {
           _addThinkingStep(event.tool, event.label);
           break;
         case 'text':
-          // Collapse thinking block when text starts arriving
-          _collapseThinking();
-          _appendOrUpdateAgentPart({ type: 'text', content: event.content });
+          // Only render text from the main agent — ignore tokens emitted while a
+          // subagent is running (their checkpoint_ns may not contain "tools:",
+          // causing subagent text to leak through the backend filter).
+          if (!subagentRunningRef.current) {
+            _collapseThinking();
+            _appendOrUpdateAgentPart({ type: 'text', content: event.content });
+          }
           break;
         case 'tool_call':
           if (event.state === 'running') {
@@ -428,9 +437,11 @@ export function useResilienceStream() {
           break;
         case 'subagent_status':
           if (event.status === 'done') {
+            subagentRunningRef.current = false;
             setSubagentStatus(null);
             _removeSubagentRunning();
           } else {
+            subagentRunningRef.current = true;
             setSubagentStatus({ status: event.status, scenario: event.scenario });
             const isLesson = (event.scenario as string).startsWith('lesson:');
             const initLabel = isLesson
@@ -467,6 +478,7 @@ export function useResilienceStream() {
         case 'done':
           _collapseThinking();
           isStreamingRef.current = false;
+          subagentRunningRef.current = false;
           setIsStreaming(false);
           setSubagentStatus(null);
           _removeSubagentRunning();
