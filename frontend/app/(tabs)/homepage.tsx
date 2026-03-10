@@ -762,7 +762,7 @@ const styles = StyleSheet.create({
   cardLarge: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 15,
+    padding: 25,
     marginBottom: 20,
     elevation: 4,
   },
