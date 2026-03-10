@@ -21,30 +21,33 @@ import {
   Text,
   View,
 } from 'react-native';
+import Markdown from 'react-native-markdown-display';
 
 import CanvasCard from '@/components/resilience/canvas-card';
 import ShockTimelineCard from '@/components/resilience/shock-timeline-card';
+import StressTestCard from '@/components/resilience/stress-test-card';
 import type {
   CanvasData,
   ChatMessage,
   MessagePart,
   ShockData,
+  StressTestData,
   ThinkingStep,
 } from '@/hooks/use-resilience-stream';
 
 // ─── Theme (mirrors page) ────────────────────────────────────────────────────
 const T = {
-  bg: '#060D1A',
-  surface: '#0D1826',
-  surfaceRaised: '#111F33',
-  border: 'rgba(79,142,247,0.12)',
-  accent: '#4F8EF7',
-  green: '#0FB67C',
-  amber: '#F5A623',
-  red: '#FF4757',
-  text: '#E8EEFF',
-  textSecondary: '#7A90B5',
-  textMuted: '#4A6080',
+  bg: '#F5F5F5',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F0F4FF',
+  border: 'rgba(30,58,138,0.1)',
+  accent: '#2563EB',
+  green: '#16A34A',
+  amber: '#D97706',
+  red: '#DC2626',
+  text: '#11181C',
+  textSecondary: '#374151',
+  textMuted: '#6B7280',
   userBubble: '#1E3A8A',
 };
 
@@ -183,7 +186,7 @@ function RenderPart({
   switch (part.type) {
     case 'text':
       if (!part.content.trim()) return null;
-      return <Text style={styles.agentText}>{part.content}</Text>;
+      return <Markdown style={markdownStyles}>{part.content}</Markdown>;
 
     case 'thinking':
       return <ThinkingBlock steps={part.steps} collapsed={part.collapsed} />;
@@ -195,6 +198,11 @@ function RenderPart({
       // Shock timeline
       if (data.card === 'shock') {
         return <ShockTimelineCard data={data as ShockData} />;
+      }
+
+      // Stress-test comparison
+      if (data.card === 'stress_test') {
+        return <StressTestCard data={data as StressTestData} />;
       }
 
       // Canvas / lesson
@@ -313,6 +321,108 @@ export default function ResilienceChat({ messages, onChipPress, onApprove }: Pro
     </View>
   );
 }
+
+// ─── Markdown styles (light theme) ──────────────────────────────────────────
+const markdownStyles = {
+  body: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: T.text,
+  },
+  paragraph: {
+    marginTop: 0,
+    marginBottom: 6,
+    fontSize: 14,
+    lineHeight: 21,
+    color: T.text,
+  },
+  strong: {
+    fontWeight: '700' as const,
+    color: T.text,
+  },
+  em: {
+    fontStyle: 'italic' as const,
+    color: T.textSecondary,
+  },
+  bullet_list: {
+    marginBottom: 6,
+  },
+  ordered_list: {
+    marginBottom: 6,
+  },
+  list_item: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: T.text,
+  },
+  bullet_list_icon: {
+    color: T.accent,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  code_inline: {
+    backgroundColor: 'rgba(37,99,235,0.08)',
+    color: T.accent,
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    fontSize: 13,
+    fontFamily: 'monospace',
+  },
+  code_block: {
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 12,
+    color: T.text,
+    fontFamily: 'monospace',
+  },
+  fence: {
+    backgroundColor: 'rgba(0,0,0,0.04)',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 12,
+    color: T.text,
+    fontFamily: 'monospace',
+  },
+  heading1: {
+    fontSize: 17,
+    fontWeight: '700' as const,
+    color: T.text,
+    marginBottom: 6,
+    marginTop: 4,
+  },
+  heading2: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: T.text,
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  heading3: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: T.textSecondary,
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  blockquote: {
+    backgroundColor: 'rgba(37,99,235,0.05)',
+    borderLeftWidth: 3,
+    borderLeftColor: T.accent,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  hr: {
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    height: 1,
+    marginVertical: 8,
+  },
+  link: {
+    color: T.accent,
+    textDecorationLine: 'underline' as const,
+  },
+};
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({

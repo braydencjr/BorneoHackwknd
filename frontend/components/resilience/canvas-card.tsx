@@ -44,7 +44,7 @@ function WebIframe({ html }: { html: string }) {
         width: '100%',
         height: '100%',
         border: 'none',
-        background: '#060D1A',
+        background: '#F5F5F5',
       }}
       title="Interactive Lesson"
     />
@@ -71,7 +71,7 @@ function CanvasModal({
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.modalRoot}>
-        <StatusBar barStyle="light-content" backgroundColor="#060D1A" />
+        <StatusBar barStyle="dark-content" backgroundColor="#F5F5F5" />
 
         {/* Modal header */}
         <View style={styles.modalHeader}>
@@ -160,16 +160,16 @@ export default function CanvasCard({ data }: { data: CanvasData }) {
 const styles = StyleSheet.create({
   /* ── Thumbnail card ── */
   card: {
-    backgroundColor: '#0D1826',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(79,142,247,0.25)',
+    borderColor: 'rgba(37,99,235,0.18)',
     marginBottom: 8,
     overflow: 'hidden',
   },
   cardAccent: {
     height: 3,
-    backgroundColor: '#4F8EF7',
+    backgroundColor: '#2563EB',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
   },
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: 'rgba(79,142,247,0.12)',
+    backgroundColor: 'rgba(37,99,235,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -197,29 +197,29 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1.2,
-    color: '#4F8EF7',
+    color: '#2563EB',
     marginBottom: 3,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#E8EEFF',
+    color: '#11181C',
     marginBottom: 3,
   },
   cardSub: {
     fontSize: 11,
-    color: '#4A6080',
+    color: '#6B7280',
   },
   cardArrow: {
     fontSize: 22,
-    color: '#4F8EF7',
+    color: '#2563EB',
     fontWeight: '300',
   },
 
   /* ── Modal ── */
   modalRoot: {
     flex: 1,
-    backgroundColor: '#060D1A',
+    backgroundColor: '#F5F5F5',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -228,8 +228,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
-    backgroundColor: '#0D1826',
+    borderBottomColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: '#FFFFFF',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: 'rgba(79,142,247,0.12)',
+    backgroundColor: 'rgba(37,99,235,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -252,20 +252,20 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#E8EEFF',
+    color: '#11181C',
     flex: 1,
   },
   closeBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: 'rgba(0,0,0,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
     fontSize: 14,
-    color: '#B8C8E0',
+    color: '#6B7280',
     fontWeight: '600',
   },
   canvasArea: {
@@ -273,6 +273,6 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
-    backgroundColor: '#060D1A',
+    backgroundColor: '#F5F5F5',
   },
 });

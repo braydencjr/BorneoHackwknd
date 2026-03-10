@@ -46,21 +46,21 @@ import {
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 const T = {
-  bg: '#060D1A',
-  surface: '#0D1826',
-  surfaceRaised: '#111F33',
-  border: 'rgba(79,142,247,0.12)',
-  borderActive: 'rgba(79,142,247,0.35)',
+  bg: '#F5F5F5',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F0F4FF',
+  border: 'rgba(30,58,138,0.1)',
+  borderActive: 'rgba(37,99,235,0.3)',
   brand: '#1E3A8A',
-  accent: '#4F8EF7',
-  green: '#0FB67C',
-  amber: '#F5A623',
-  red: '#FF4757',
-  text: '#E8EEFF',
-  textSecondary: '#7A90B5',
-  textMuted: '#4A6080',
+  accent: '#2563EB',
+  green: '#16A34A',
+  amber: '#D97706',
+  red: '#DC2626',
+  text: '#11181C',
+  textSecondary: '#374151',
+  textMuted: '#6B7280',
   userBubble: '#1E3A8A',
-  inputBg: '#0F1D30',
+  inputBg: '#F0F4FF',
 };
 
 // ─── Helpers: extract latest dashboard data from messages ────────────────────
@@ -714,10 +714,10 @@ const styles = StyleSheet.create({
   alertStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,71,87,0.08)',
+    backgroundColor: 'rgba(220,38,38,0.06)',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,71,87,0.25)',
+    borderColor: 'rgba(220,38,38,0.2)',
     padding: 14,
     gap: 12,
   },
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
     backgroundColor: T.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(245,166,35,0.15)',
+    borderColor: 'rgba(217,119,6,0.15)',
     overflow: 'hidden',
   },
   planHeader: {

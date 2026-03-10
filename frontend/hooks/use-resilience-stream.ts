@@ -62,6 +62,29 @@ export type ShockMonth = {
   savings_remaining: number;
   status: 'ok' | 'warning' | 'critical' | 'depleted';
   label: string;
+  phase?: string;
+};
+
+export type ShockPhase = {
+  id: string;
+  label: string;
+  month_start: number;
+  month_end: number;
+  description: string;
+};
+
+export type SafetyNet = {
+  name: string;
+  available: number;
+  note: string;
+};
+
+export type SurvivalAction = {
+  action: string;
+  monthly_impact: number;
+  type: 'income' | 'expense_cut' | 'preparation';
+  impact_label: string;
+  description: string;
 };
 
 export type ShockData = {
@@ -77,6 +100,38 @@ export type ShockData = {
   timeline: ShockMonth[];
   depletes_at_month: number | null;
   survives: boolean;
+  // Rich simulation fields
+  phases?: ShockPhase[];
+  safety_nets?: SafetyNet[];
+  survival_actions?: SurvivalAction[];
+  survival_comparison?: {
+    without_actions: number | null;
+    with_actions: number | null;
+    gain_months: number | null;
+  };
+  risk_probability?: string;
+  insurance_gap_note?: string;
+};
+
+export type StressTestScenario = {
+  scenario: string;
+  label: string;
+  icon: string;
+  monthly_burn: number;
+  depletes_at_month: number | null;
+  survives: boolean;
+  risk_probability: string;
+};
+
+export type StressTestData = {
+  card: 'stress_test';
+  months_simulated: number;
+  starting_savings: number;
+  scenarios: StressTestScenario[];
+  most_dangerous: string;
+  safest: string;
+  survival_count: number;
+  verdict: string;
 };
 
 export type ChipsData = {
@@ -90,7 +145,7 @@ export type CanvasData = {
   html: string;
 };
 
-export type CardData = VitalsData | ScoreData | AlertData | PlanData | ShockData | ChipsData | CanvasData;
+export type CardData = VitalsData | ScoreData | AlertData | PlanData | ShockData | StressTestData | ChipsData | CanvasData;
 
 export type ThinkingStep = {
   id: string;
