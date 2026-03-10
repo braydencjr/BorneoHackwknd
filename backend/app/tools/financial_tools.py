@@ -211,7 +211,7 @@ async def show_savings_plan(user_id: str) -> str:
 async def suggest_actions(chips: list[str]) -> str:
     """
     Render 2-4 contextual action chips for the user to tap next.
-    YOU decide what chips to show based on the conversation so far.
+    YOU decide what chips to show based on the conversation so far. Ensure it is relevant to the current conversation history and context
     Pass a list of short, tappable suggestion strings relevant to the user's situation.
     Example: ["What if I lose my job?", "Show me a savings plan", "How do I cut BNPL debt?"]
     Always call this at the end of the initial scan and after any major answer.
