@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # Gemini AI — set GEMINI_API_KEY in .env
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     # Anthropic Claude — optional; used for educator subagent if set
     CLAUDE_API_KEY: str = ""

@@ -80,7 +80,7 @@ def _get_overview_agent():
         from app.core.config import Settings
         settings = Settings()
         api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
-        model_name = settings.GEMINI_MODEL or "gemini-2.0-flash"
+        model_name = settings.GEMINI_MODEL or "gemini-2.5-flash"
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY is not set. Add it to your .env file.")
         model = _build_model(api_key, model_name)
