@@ -22,6 +22,8 @@ from app.core.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.models.regional_risk import RegionalRiskCache
+from app.models.contingency_plan import ContingencyPlan
+from app.models.transactions import Transaction
 from app.services.contingency_service import calculate_plan, update_progress
 
 router = APIRouter()
@@ -30,6 +32,10 @@ router = APIRouter()
 
 class ProgressUpdate(BaseModel):
     current_progress: float  # RM amount the user has already saved
+
+
+class SaveToFundRequest(BaseModel):
+    amount: float  # RM amount to allocate to the emergency fund this session
 
 
 # ─── GET / ─────────────────────────────────────────────────────────────────────
@@ -77,6 +83,74 @@ async def patch_progress(
         )
     result = await update_progress(db, current_user, body.current_progress)
     return result
+
+
+# ─── POST /save-to-fund ────────────────────────────────────────────────────────
+
+@router.post("/save-to-fund")
+async def save_to_fund(
+    body: SaveToFundRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Records a real savings contribution to the emergency fund.
+
+    - Creates a Transaction(type="savings", category="Emergency Fund") so it
+      appears in the transaction history and survives plan recalculations.
+    - Warns (but does NOT block) when the amount exceeds the user's monthly surplus
+      or when the surplus is already zero/negative.
+    - Force-recalculates the contingency plan so progress_percentage updates
+      immediately.
+    """
+    if body.amount <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Amount must be greater than 0.",
+        )
+
+    # ── Check surplus for a helpful warning ──────────────────────────────────
+    plan_result = await db.execute(
+        select(ContingencyPlan).where(ContingencyPlan.user_id == current_user.id)
+    )
+    existing_plan = plan_result.scalar_one_or_none()
+
+    warning: str | None = None
+    if existing_plan is not None:
+        surplus = existing_plan.surplus or 0.0
+        if surplus <= 0:
+            warning = (
+                f"Your current monthly surplus is RM{surplus:.2f}. "
+                "Saving now may put you in a negative cash flow position. "
+                "Proceed with caution."
+            )
+        elif body.amount > surplus:
+            warning = (
+                f"RM{body.amount:.2f} exceeds your monthly surplus of RM{surplus:.2f}. "
+                f"Consider saving RM{existing_plan.monthly_savings_target:.2f} instead."
+            )
+
+    # ── Create the savings transaction ───────────────────────────────────────
+    transaction = Transaction(
+        user_id=current_user.id,
+        merchant_name="Emergency Fund",
+        amount=body.amount,
+        type="savings",
+        category="Emergency Fund",
+        receipt_image="",
+    )
+    db.add(transaction)
+    await db.commit()
+    await db.refresh(transaction)
+
+    # ── Force-recalculate so current_progress reflects the new transaction ───
+    updated_plan = await calculate_plan(db, current_user, force_recalculate=True)
+
+    return {
+        **updated_plan,
+        "warning": warning,
+        "transaction_id": transaction.id,
+    }
 
 
 # ─── GET /regional-risks ───────────────────────────────────────────────────────

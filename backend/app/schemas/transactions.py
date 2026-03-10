@@ -11,6 +11,7 @@ class TransactionOut(BaseModel):
     id: int
     merchant_name: str
     amount: float
+    type: str
     category: str
     receipt_image: str
     created_at: datetime

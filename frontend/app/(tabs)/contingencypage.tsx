@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import api from "../../services/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -53,6 +53,8 @@ const TAB_CONTEXT: Record<string, string> = {
 export default function ContingencyPage() {
 
   const [containerWidth, setContainerWidth] = useState(0);
+  const [savingInput, setSavingInput] = useState("");
+  const [saving, setSaving] = useState(false);
   const indicatorPosition = useState(new Animated.Value(0))[0];
   const [selectedTab, setSelectedTab] = useState<"A" | "B" | "C" | "D">("A");
 
@@ -160,6 +162,37 @@ export default function ContingencyPage() {
     );
   }
 
+  async function handleSaveToFund() {
+    const amount = parseFloat(savingInput);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert("Invalid amount", "Please enter a valid amount greater than 0.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const result = await api.post<Plan & { warning?: string; transaction_id?: number }>(
+        "/contingency/save-to-fund",
+        { amount }
+      );
+      // Strip non-Plan keys before storing
+      const { warning, transaction_id, ...planData } = result;
+      setPlan(planData as Plan);
+      setSavingInput("");
+      if (warning) {
+        Alert.alert(
+          "Saved with a note \u26a0\ufe0f",
+          `RM ${amount.toFixed(2)} added to your fund.\n\n${warning}`
+        );
+      } else {
+        Alert.alert("Saved! \ud83c\udf89", `RM ${amount.toFixed(2)} added to your emergency fund.`);
+      }
+    } catch (err: any) {
+      Alert.alert("Error", err.message ?? "Could not save to fund.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Contingency Planning</Text>
@@ -239,6 +272,29 @@ export default function ContingencyPage() {
             RM{fmt(plan.current_progress)} saved · {plan.progress_percentage.toFixed(1)}% complete
             {plan.months_to_goal ? ` · ~${plan.months_to_goal} months to goal` : ""}
           </Text>
+        )}
+
+        {/* ── Save to Fund ── */}
+        {!loading && plan && (
+          <View style={styles.saveRow}>
+            <TextInput
+              style={styles.saveInput}
+              placeholder="RM amount to save"
+              keyboardType="numeric"
+              value={savingInput}
+              onChangeText={setSavingInput}
+              editable={!saving}
+            />
+            <TouchableOpacity
+              style={[styles.saveButton, saving && { opacity: 0.6 }]}
+              onPress={handleSaveToFund}
+              disabled={saving}
+            >
+              {saving
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={styles.saveButtonText}>+ Save to Fund</Text>}
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -544,6 +600,37 @@ title: {
     fontSize: 14,
     color: "#666",
     marginBottom: 20,
+  },
+
+  saveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 12,
+    gap: 8,
+  },
+
+  saveInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    backgroundColor: "#fff",
+  },
+
+  saveButton: {
+    backgroundColor: "#1E3A8A",
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+
+  saveButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 13,
   },
 
 });
