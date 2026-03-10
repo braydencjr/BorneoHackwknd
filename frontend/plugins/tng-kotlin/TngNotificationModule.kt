@@ -2,6 +2,7 @@ package com.borneohackwknd.app
 
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.text.TextUtils
 import android.util.Log
@@ -79,6 +80,136 @@ class TngNotificationModule(reactContext: ReactApplicationContext) :
         }
     }
 
+    /**
+     * Open app details page. Useful when users need to allow restricted settings
+     * or adjust OEM-specific background behavior.
+     */
+    @ReactMethod
+    fun openAppDetailsSettings(promise: Promise) {
+        try {
+            val pkg = reactApplicationContext.packageName
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$pkg")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERR_OPEN_APP_DETAILS", e.message, e)
+        }
+    }
+
+    /**
+     * Open battery optimization settings page.
+     */
+    @ReactMethod
+    fun openBatteryOptimizationSettings(promise: Promise) {
+        try {
+            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            reactApplicationContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERR_OPEN_BATTERY_SETTINGS", e.message, e)
+        }
+    }
+
+    /**
+     * Best-effort attempt to open OEM background/autostart settings.
+     * Returns the screen that was opened.
+     */
+    @ReactMethod
+    fun openBackgroundProtectionSettings(promise: Promise) {
+        try {
+            val intents = listOf(
+                // Xiaomi / MIUI autostart settings
+                Intent().setComponent(
+                    ComponentName(
+                        "com.miui.securitycenter",
+                        "com.miui.permcenter.autostart.AutoStartManagementActivity"
+                    )
+                ),
+                // OPPO / Realme startup manager
+                Intent().setComponent(
+                    ComponentName(
+                        "com.coloros.safecenter",
+                        "com.coloros.safecenter.permission.startup.StartupAppListActivity"
+                    )
+                ),
+                Intent().setComponent(
+                    ComponentName(
+                        "com.oppo.safe",
+                        "com.oppo.safe.permission.startup.StartupAppListActivity"
+                    )
+                ),
+                // Vivo iManager
+                Intent().setComponent(
+                    ComponentName(
+                        "com.iqoo.secure",
+                        "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"
+                    )
+                ),
+                // Huawei protected apps
+                Intent().setComponent(
+                    ComponentName(
+                        "com.huawei.systemmanager",
+                        "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
+                    )
+                ),
+            )
+
+            for (intent in intents) {
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                if (startActivitySafely(intent)) {
+                    promise.resolve("oem_background")
+                    return
+                }
+            }
+
+            val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (startActivitySafely(fallback)) {
+                promise.resolve("battery_optimization")
+                return
+            }
+
+            val appDetails = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:${reactApplicationContext.packageName}")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            if (startActivitySafely(appDetails)) {
+                promise.resolve("app_details")
+                return
+            }
+
+            promise.resolve("none")
+        } catch (e: Exception) {
+            promise.reject("ERR_OPEN_BACKGROUND_PROTECTION", e.message, e)
+        }
+    }
+
+    /**
+     * Request the system to rebind the NotificationListenerService.
+     * Useful when MIUI or other OEMs have cached a rejection even after the user
+     * has enabled Autostart and battery settings — forces a fresh bind attempt.
+     */
+    @ReactMethod
+    fun requestNotificationListenerRebind(promise: Promise) {
+        try {
+            val cn = ComponentName(reactApplicationContext, TngNotificationListenerService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                android.service.notification.NotificationListenerService.requestRebind(cn)
+                promise.resolve(true)
+            } else {
+                promise.resolve(false)
+            }
+        } catch (e: Exception) {
+            promise.reject("ERR_REBIND", e.message, e)
+        }
+    }
+
     // ─── Helpers ───────────────────────────────────────────────────────
 
     private fun isListenerEnabled(): Boolean {
@@ -95,5 +226,14 @@ class TngNotificationModule(reactContext: ReactApplicationContext) :
         reactApplicationContext
             .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
             .emit(eventName, params)
+    }
+
+    private fun startActivitySafely(intent: Intent): Boolean {
+        return try {
+            reactApplicationContext.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 }

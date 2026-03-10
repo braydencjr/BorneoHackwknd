@@ -5,25 +5,32 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 
 /**
- * Android NotificationListenerService that captures notifications from
- * Touch 'n Go eWallet (my.com.tngdigital.ewallet).
- *
- * This service requires the user to explicitly grant Notification Access
- * in Android Settings. It runs in the background and forwards matching
- * notification content to the React Native layer via TngNotificationModule.
+ * Android NotificationListenerService that captures TNG eWallet notifications
+ * and forwards them to the React Native JS layer via TngNotificationModule.
  */
 class TngNotificationListenerService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "TngNotifListener"
-        private const val TNG_PACKAGE = "my.com.tngdigital.ewallet"
+        private const val TARGET_PACKAGE = "my.com.tngdigital.ewallet"
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        Log.i(TAG, "Notification listener connected")
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        Log.w(TAG, "Notification listener disconnected")
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
 
-        // Only process TNG eWallet notifications
-        if (sbn.packageName != TNG_PACKAGE) return
+        Log.d(TAG, "onNotificationPosted: pkg=${sbn.packageName}")
+
+        if (sbn.packageName != TARGET_PACKAGE) return
 
         val extras = sbn.notification.extras
         val title = extras.getCharSequence("android.title")?.toString() ?: ""
@@ -31,30 +38,26 @@ class TngNotificationListenerService : NotificationListenerService() {
         val bigText = extras.getCharSequence("android.bigText")?.toString() ?: ""
         val subText = extras.getCharSequence("android.subText")?.toString() ?: ""
 
-        // Use bigText if available (usually contains full notification content),
-        // otherwise fall back to the standard text field
-        val content = bigText.ifBlank { text }
+        Log.i(TAG, "TNG notif — title=\"$title\" text=\"$text\" bigText=\"$bigText\"")
 
+        val content = bigText.ifBlank { text }
         if (content.isBlank()) {
-            Log.d(TAG, "Empty TNG notification – skipping")
+            Log.d(TAG, "Empty TNG notification - skipping")
             return
         }
 
-        val notificationData = mapOf(
-            "title" to title,
-            "text" to content,
-            "subText" to subText,
-            "timestamp" to sbn.postTime.toString(),
-            "packageName" to sbn.packageName,
+        TngNotificationModule.emitNotification(
+            mapOf(
+                "title" to title,
+                "text" to content,
+                "subText" to subText,
+                "timestamp" to sbn.postTime.toString(),
+                "packageName" to sbn.packageName,
+            )
         )
-
-        Log.d(TAG, "TNG notification captured: $title | $content")
-
-        // Forward to the React Native module
-        TngNotificationModule.emitNotification(notificationData)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        // No action needed when notifications are dismissed
+        // No action needed
     }
 }

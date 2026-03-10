@@ -1,3 +1,7 @@
+import {
+    hasConsent,
+    isNotificationAccessEnabled,
+} from "@/services/notificationService";
 import { useGoogleAuth } from "@/services/useGoogleAuth";
 import { AntDesign } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -40,6 +44,22 @@ export default function Login() {
         username: email.trim().toLowerCase(),
         password,
       });
+
+      if (Platform.OS === "android") {
+        const [consentGranted, accessEnabled] = await Promise.all([
+          hasConsent(),
+          isNotificationAccessEnabled(),
+        ]);
+
+        if (!consentGranted || !accessEnabled) {
+          router.replace({
+            pathname: "/notification-consent",
+            params: { next: "/(tabs)/homepage" },
+          });
+          return;
+        }
+      }
+
       router.replace("/(tabs)/homepage");
     } catch (error: any) {
       Alert.alert(

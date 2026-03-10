@@ -17,6 +17,12 @@ import api from "./api";
 interface TngNotificationNativeModule {
   isNotificationAccessEnabled(): Promise<boolean>;
   openNotificationAccessSettings(): Promise<boolean>;
+  openAppDetailsSettings(): Promise<boolean>;
+  openBatteryOptimizationSettings(): Promise<boolean>;
+  openBackgroundProtectionSettings(): Promise<
+    "oem_background" | "battery_optimization" | "app_details" | "none"
+  >;
+  requestNotificationListenerRebind(): Promise<boolean>;
 }
 
 export interface TngNotificationPayload {
@@ -59,6 +65,44 @@ export async function openNotificationAccessSettings(): Promise<void> {
   const mod = getNativeModule();
   if (!mod) return;
   await mod.openNotificationAccessSettings();
+}
+
+/** Open this app's details settings screen. */
+export async function openAppDetailsSettings(): Promise<void> {
+  const mod = getNativeModule();
+  if (!mod) return;
+  await mod.openAppDetailsSettings();
+}
+
+/** Open battery optimization settings. */
+export async function openBatteryOptimizationSettings(): Promise<void> {
+  const mod = getNativeModule();
+  if (!mod) return;
+  await mod.openBatteryOptimizationSettings();
+}
+
+/**
+ * Best-effort open OEM background/autostart settings.
+ * Returns which page was opened, if any.
+ */
+export async function openBackgroundProtectionSettings(): Promise<
+  "oem_background" | "battery_optimization" | "app_details" | "none"
+> {
+  const mod = getNativeModule();
+  if (!mod) return "none";
+  return mod.openBackgroundProtectionSettings();
+}
+
+/**
+ * Request the system to rebind the NotificationListenerService.
+ * Call this after enabling Autostart/Battery settings to force MIUI/OEM to
+ * retry the bind without needing to re-toggle Notification Access manually.
+ * Returns true if the rebind was requested, false on older API levels.
+ */
+export async function requestNotificationListenerRebind(): Promise<boolean> {
+  const mod = getNativeModule();
+  if (!mod) return false;
+  return mod.requestNotificationListenerRebind();
 }
 
 /** Check whether the user has granted in-app consent. */

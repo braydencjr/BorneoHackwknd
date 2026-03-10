@@ -5,8 +5,8 @@
  * into the Android build. This survives `expo prebuild` / `expo run:android`.
  *
  * It performs 4 modifications:
- *   1. Adds BIND_NOTIFICATION_LISTENER_SERVICE permission to AndroidManifest.xml
- *   2. Adds the <service> declaration for TngNotificationListenerService
+ *   1. Adds the <service> declaration for TngNotificationListenerService
+ *      with android:permission=BIND_NOTIFICATION_LISTENER_SERVICE
  *   3. Adds `add(TngNotificationPackage())` to MainApplication's getPackages()
  *   4. Copies the 3 Kotlin source files into the android project
  */
@@ -19,32 +19,11 @@ const {
 const fs = require("fs");
 const path = require("path");
 
-// ─── 1 & 2: AndroidManifest.xml ────────────────────────────────────────────
+// ─── 1: AndroidManifest.xml ────────────────────────────────────────────────
 
 function addManifestMods(config) {
   return withAndroidManifest(config, (cfg) => {
     const manifest = cfg.modResults;
-
-    // Add permission (if not already present)
-    if (!manifest.manifest["uses-permission"]) {
-      manifest.manifest["uses-permission"] = [];
-    }
-    const perms = manifest.manifest["uses-permission"];
-    const permName = "android.permission.BIND_NOTIFICATION_LISTENER_SERVICE";
-    const exists = perms.some((p) => p.$?.["android:name"] === permName);
-    if (!exists) {
-      perms.push({
-        $: {
-          "android:name": permName,
-          "tools:ignore": "ProtectedPermissions",
-        },
-      });
-    }
-
-    // Ensure tools namespace is declared
-    if (!manifest.manifest.$["xmlns:tools"]) {
-      manifest.manifest.$["xmlns:tools"] = "http://schemas.android.com/tools";
-    }
 
     // Add <service> inside <application> (if not already present)
     const app = manifest.manifest.application?.[0];

@@ -3,7 +3,7 @@ import {
     DefaultTheme,
     ThemeProvider,
 } from "@react-navigation/native";
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import { Platform } from "react-native";
@@ -13,12 +13,41 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
     classifyNotification,
     hasConsent,
+    isNotificationAccessEnabled,
     subscribeTngNotifications,
     type TngNotificationPayload,
 } from "@/services/notificationService";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
+  const segments = useSegments();
+
+  // Force an explicit consent + system permission step before listener usage.
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+
+    let cancelled = false;
+
+    (async () => {
+      const inMainApp = segments[0] === "(tabs)";
+      const onConsentScreen = segments[0] === "notification-consent";
+      if (!inMainApp || onConsentScreen) return;
+
+      const [consentGranted, accessEnabled] = await Promise.all([
+        hasConsent(),
+        isNotificationAccessEnabled(),
+      ]);
+
+      if (!cancelled && (!consentGranted || !accessEnabled)) {
+        router.push("/notification-consent");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, segments]);
 
   // Background TNG notification listener (Android only)
   useEffect(() => {
