@@ -26,6 +26,36 @@ interface Plan {
   surplus: number;
 }
 
+interface MonthProjection {
+  month: number;
+  income: number;
+  expense: number;           // total projected expenses
+  deficit: number;          // income - expense (negative = shortfall)
+}
+interface ShockReport {
+  shock_type: string;
+  severity_label: string;    // "moderate" | "severe" | "critical"
+  duration_months: number;
+  monthly_projected: MonthProjection[];
+  total_shortfall: number;   // negative RM value (sum of deficits)
+  months_until_broke: number | null;
+  grand_total_impact: number;
+  one_time_cost_estimate: number;
+  baseline_monthly_income: number;
+  baseline_monthly_expense: number;
+  narrative: string;
+  action_today: string;
+  regional_risks: { event_title: string; severity: number; source_url: string }[];
+}
+
+// Map tab key → shock_type for the API
+const TAB_SHOCK: Record<string, string> = {
+  A: "illness",
+  B: "job_loss",
+  C: "disaster",
+  D: "war",
+};
+
 // Indicators that are most relevant per tab
 const TAB_RELEVANT: Record<string, string[]> = {
   A: ["health_exposure_high"],
@@ -62,6 +92,10 @@ export default function ContingencyPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  const [shockCache, setShockCache] = useState<Record<string, ShockReport>>({});
+  const [shockLoading, setShockLoading] = useState(false);
+  const [shockError, setShockError] = useState<string | null>(null);
+
   const tabs = [
     { key: "A", label: "Illness",        icon: "medkit-outline"      },
     { key: "B", label: "Job Loss",       icon: "briefcase-outline"   },
@@ -78,11 +112,24 @@ export default function ContingencyPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Fetch shock simulation for the active tab (cached per tab)
+  useEffect(() => {
+    const shockType = TAB_SHOCK[selectedTab];
+    if (shockCache[selectedTab]) return;   // already loaded
+    setShockLoading(true);
+    setShockError(null);
+    api.get<ShockReport>(`/contingency/shock/${shockType}`)
+      .then((data) => setShockCache((prev) => ({ ...prev, [selectedTab]: data })))
+      .catch((e) => setShockError(e.message ?? "Could not load simulation."))
+      .finally(() => setShockLoading(false));
+  }, [selectedTab]);
+
   const fmt = (n: number) =>
     n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // ── White card content per tab ────────────────────────────────────────────
   function renderWhiteCard() {
+    // Plan still loading
     if (loading) {
       return (
         <View style={styles.cardInner}>
@@ -100,62 +147,152 @@ export default function ContingencyPage() {
       );
     }
 
-    const relevant = TAB_RELEVANT[selectedTab];
-    const fired = plan.active_indicators.filter((i) => relevant.includes(i.name));
+    const shock = shockCache[selectedTab];
+
+    // Shock still loading
+    if (shockLoading && !shock) {
+      return (
+        <View style={styles.cardInner}>
+          <ActivityIndicator size="small" color="#1E3A8A" />
+          <Text style={styles.cardLoadingText}>Running scenario simulation…</Text>
+        </View>
+      );
+    }
+
+    // Shock error fallback — show static risk indicators
+    if (shockError || !shock) {
+      const relevant = TAB_RELEVANT[selectedTab];
+      const fired = plan.active_indicators.filter((i) => relevant.includes(i.name));
+      return (
+        <View style={styles.cardInner}>
+          <Text style={styles.cardContext}>{TAB_CONTEXT[selectedTab]}</Text>
+          {shockError && (
+            <Text style={[styles.riskDetail, { color: "#F59E0B", marginBottom: 8 }]}>
+              ⚠ Live simulation unavailable — showing risk indicators
+            </Text>
+          )}
+          {fired.length > 0 ? (
+            <>
+              <Text style={styles.riskHeader}>⚠ Risk factors for this scenario:</Text>
+              {fired.map((ind) => (
+                <View key={ind.name} style={styles.riskRow}>
+                  <View style={[
+                    styles.riskDot,
+                    { backgroundColor: ind.score >= 0.7 ? "#EF4444" : ind.score >= 0.4 ? "#F59E0B" : "#10B981" },
+                  ]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.riskLabel}>{INDICATOR_LABEL[ind.name] ?? ind.name}</Text>
+                    {ind.detail ? (
+                      <Text style={styles.riskDetail} numberOfLines={2}>{ind.detail}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </>
+          ) : (
+            <View style={styles.allClearRow}>
+              <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
+              <Text style={styles.allClearText}>No major risk factors for this scenario.</Text>
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    // ── Full shock simulation card ──────────────────────────────────────────
+    // months_until_broke: how long the fund lasts; cap at duration for display
+    const fundMonths = Math.min(shock.months_until_broke ?? shock.duration_months, shock.duration_months);
+    const coveragePct = Math.min((fundMonths / shock.duration_months) * 100, 100);
+    const coverageColor = coveragePct >= 80 ? "#10B981" : coveragePct >= 40 ? "#F59E0B" : "#EF4444";
 
     return (
       <View style={styles.cardInner}>
-        <Text style={styles.cardContext}>{TAB_CONTEXT[selectedTab]}</Text>
 
-        {/* Fund runway */}
-        <View style={styles.runwayRow}>
-          <Ionicons name="shield-checkmark-outline" size={16} color="#1E3A8A" />
-          <Text style={styles.runwayText}>
-            Your fund targets{" "}
-            <Text style={styles.runwayBold}>{plan.target_months.toFixed(1)} months</Text>
-            {" "}of expenses
-          </Text>
+        {/* Severity badge */}
+        <View style={styles.severityRow}>
+          <View style={[styles.severityBadge, {
+            backgroundColor: shock.severity_label === "critical" ? "#FEE2E2" : shock.severity_label === "severe" ? "#FEE2E2" : "#FEF3C7",
+          }]}>
+            <Text style={[styles.severityText, {
+              color: shock.severity_label === "critical" ? "#7F1D1D" : shock.severity_label === "severe" ? "#DC2626" : "#92400E",
+            }]}>
+              {shock.severity_label === "critical" ? "🔴 Critical scenario" : shock.severity_label === "severe" ? "🔴 Severe scenario" : "🟡 Moderate scenario"}
+            </Text>
+          </View>
         </View>
 
-        {fired.length > 0 ? (
-          <>
-            <Text style={styles.riskHeader}>⚠ Risk factors for this scenario:</Text>
-            {fired.map((ind) => (
-              <View key={ind.name} style={styles.riskRow}>
-                <View style={[
-                  styles.riskDot,
-                  { backgroundColor: ind.score >= 0.7 ? "#EF4444" : ind.score >= 0.4 ? "#F59E0B" : "#10B981" },
-                ]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.riskLabel}>
-                    {INDICATOR_LABEL[ind.name] ?? ind.name}
-                  </Text>
-                  {ind.detail ? (
-                    <Text style={styles.riskDetail} numberOfLines={2}>{ind.detail}</Text>
-                  ) : null}
-                </View>
-              </View>
-            ))}
-          </>
-        ) : (
-          <View style={styles.allClearRow}>
-            <Ionicons name="checkmark-circle-outline" size={20} color="#10B981" />
-            <Text style={styles.allClearText}>No major risk factors for this scenario.</Text>
+        {/* Fund coverage bar */}
+        <Text style={styles.coverageLabel}>Fund coverage for this scenario</Text>
+        <View style={styles.coverageBar}>
+          <View style={[styles.coverageFill, {
+            width: `${coveragePct}%` as any,
+            backgroundColor: coverageColor,
+          }]} />
+        </View>
+        <Text style={[styles.coverageSub, { color: coverageColor }]}>
+          {fundMonths.toFixed(1)} / {shock.duration_months} months covered
+          {(shock.months_until_broke !== null && shock.months_until_broke !== undefined && shock.months_until_broke < shock.duration_months)
+            ? `  ·  fund depleted by month ${Math.ceil(shock.months_until_broke)}`
+            : "  ·  fund fully covers this shock"}
+        </Text>
+
+        {/* Shortfall chip */}
+        {shock.grand_total_impact > 0 && (
+          <View style={styles.shortfallChip}>
+            <Ionicons name="warning-outline" size={14} color="#DC2626" />
+            <Text style={styles.shortfallChipText}>
+              RM{fmt(shock.grand_total_impact)} total impact over {shock.duration_months} months
+              {shock.one_time_cost_estimate > 0 ? `  (incl. RM${fmt(shock.one_time_cost_estimate)} one-off)` : ""}
+            </Text>
           </View>
         )}
 
-        {selectedTab === "C" && (
-          <View style={[styles.riskBadge, {
-            backgroundColor:
-              plan.regional_risk_level === "high" ? "#FEE2E2" :
-              plan.regional_risk_level === "medium" ? "#FEF3C7" : "#D1FAE5",
-          }]}>
-            <Text style={styles.riskBadgeText}>
-              Regional risk level:{" "}
-              <Text style={{ fontWeight: "700", textTransform: "capitalize" }}>
-                {plan.regional_risk_level}
-              </Text>
+        {/* Monthly mini-table */}
+        <View style={styles.tableHeader}>
+          <Text style={styles.tableCell}>Mo.</Text>
+          <Text style={styles.tableCell}>Income</Text>
+          <Text style={styles.tableCell}>Expenses</Text>
+          <Text style={[styles.tableCell, { color: "#1E3A8A" }]}>Net</Text>
+        </View>
+        {(shock.monthly_projected ?? []).map((m) => (
+          <View key={m.month} style={[styles.tableRow, m.deficit < 0 && styles.tableRowRed]}>
+            <Text style={styles.tableCell}>{m.month}</Text>
+            <Text style={styles.tableCell}>RM{fmt(m.income)}</Text>
+            <Text style={styles.tableCell}>RM{fmt(m.expense)}</Text>
+            <Text style={[styles.tableCell, { color: m.deficit < 0 ? "#EF4444" : "#10B981", fontWeight: "600" }]}>
+              {m.deficit < 0 ? "−" : "+"}RM{fmt(Math.abs(m.deficit))}
             </Text>
+          </View>
+        ))}
+
+        {/* AI Narrative */}
+        {shock.narrative ? (
+          <View style={styles.narrativeBox}>
+            <Text style={styles.narrativeTitle}>📊 AI Analysis</Text>
+            <Text style={styles.narrativeText}>{shock.narrative}</Text>
+          </View>
+        ) : null}
+
+        {/* Action callout */}
+        {shock.action_today ? (
+          <View style={styles.actionBox}>
+            <Text style={styles.actionTitle}>✅ Do this today</Text>
+            <Text style={styles.actionText}>{shock.action_today}</Text>
+          </View>
+        ) : null}
+
+        {/* Regional signals */}
+        {(shock.regional_risks ?? []).length > 0 && (
+          <View style={{ marginTop: 12 }}>
+            <Text style={styles.riskHeader}>📡 Regional signals</Text>
+            {shock.regional_risks.map((r, i) => (
+              <View key={i} style={styles.riskRow}>
+                <View style={[styles.riskDot, {
+                  backgroundColor: r.severity >= 4 ? "#EF4444" : r.severity >= 2 ? "#F59E0B" : "#6B7280",
+                }]} />
+                <Text style={styles.riskLabel} numberOfLines={2}>{r.event_title}</Text>
+              </View>
+            ))}
           </View>
         )}
       </View>
@@ -443,10 +580,11 @@ const styles = StyleSheet.create({
 
 mainCard: {
   width: "100%",
-  height: 300,
+  minHeight: 320,
   backgroundColor: "#FFFFFF",
   borderRadius: 25,
   elevation: 8,
+  overflow: "hidden",
 },
 
 progressTabs: {
@@ -499,9 +637,8 @@ indicator: {
 
 // ── White card inner styles ────────────────────────────────────────────────
 cardInner: {
-  flex: 1,
-  padding: 20,
-  justifyContent: "center",
+  padding: 16,
+  paddingTop: 52,   // leaves room below the floating tab bar (~35px tall + 17px gap)
 },
 cardLoadingText: {
   textAlign: "center",
@@ -631,6 +768,117 @@ title: {
     color: "#fff",
     fontWeight: "600",
     fontSize: 13,
+  },
+
+  // ── Shock simulation card styles ─────────────────────────────────────────
+  severityRow: {
+    marginBottom: 10,
+  },
+  severityBadge: {
+    alignSelf: "flex-start",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  severityText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  coverageLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  coverageBar: {
+    height: 10,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 5,
+    overflow: "hidden",
+    marginBottom: 4,
+  },
+  coverageFill: {
+    height: "100%",
+    borderRadius: 5,
+  },
+  coverageSub: {
+    fontSize: 11,
+    marginBottom: 10,
+  },
+  shortfallChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FEE2E2",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  shortfallChipText: {
+    fontSize: 12,
+    color: "#DC2626",
+    fontWeight: "600",
+    flex: 1,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    marginBottom: 4,
+  },
+  tableRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  tableRowRed: {
+    backgroundColor: "#FFF5F5",
+  },
+  tableCell: {
+    fontSize: 11,
+    color: "#374151",
+    flex: 1,
+    textAlign: "center",
+  },
+  narrativeBox: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 12,
+  },
+  narrativeTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#1E3A8A",
+    marginBottom: 6,
+  },
+  narrativeText: {
+    fontSize: 12,
+    color: "#374151",
+    lineHeight: 18,
+  },
+  actionBox: {
+    backgroundColor: "#ECFDF5",
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: "#10B981",
+  },
+  actionTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#065F46",
+    marginBottom: 4,
+  },
+  actionText: {
+    fontSize: 12,
+    color: "#065F46",
+    lineHeight: 17,
   },
 
 });

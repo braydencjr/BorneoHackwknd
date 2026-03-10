@@ -15,7 +15,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -25,6 +25,10 @@ from app.models.regional_risk import RegionalRiskCache
 from app.models.contingency_plan import ContingencyPlan
 from app.models.transactions import Transaction
 from app.services.contingency_service import calculate_plan, update_progress
+from app.services.vulnerability_profiler import build_vulnerability_profile
+from app.services.shock_simulation_service import run_shock_simulation
+from app.services.shock_narrative_service import generate_shock_narrative
+from app.services.regional_risk_service import fetch_or_refresh_risks
 
 router = APIRouter()
 
@@ -212,13 +216,13 @@ async def get_shock_simulation(
     current_user: User = Depends(get_current_user),
 ):
     """
-    [Phase 4 + 5 — Shock Simulation Engine + Gemini Narrative]
+    Runs a personalized shock simulation and returns projections + a Gemini narrative.
 
-    Runs a personalised financial shock simulation for the given shock type and
-    returns impact projections + an AI-generated narrative.
-
-    This endpoint is a placeholder until Phase 4 (shock_simulation_service) and
-    Phase 5 (shock_narrative_service) are implemented.
+    1. Builds vulnerability profile from the user's real transactions
+    2. Fetches (or refreshes) Tavily regional risk data for this shock type
+    3. Computes personalized impact projections (multipliers derived from the user's own
+       spending ratios; trends extrapolated via linear regression)
+    4. Generates a Malaysia-specific Gemini narrative with the user's real RM numbers
     """
     if shock_type not in VALID_SHOCK_TYPES:
         raise HTTPException(
@@ -226,17 +230,151 @@ async def get_shock_simulation(
             detail=f"shock_type must be one of: {', '.join(sorted(VALID_SHOCK_TYPES))}",
         )
 
-    # ── TODO Phase 4: replace with real simulation ────────────────────────────
-    # from app.services.shock_simulation_service import run_shock_simulation
-    # from app.services.shock_narrative_service  import generate_narrative
-    # profile = await build_vulnerability_profile(db, current_user)
-    # simulation = await run_shock_simulation(profile, shock_type, duration_months, severity)
-    # narrative  = await generate_narrative(simulation)
-    # return {**simulation, **narrative}
-    # ─────────────────────────────────────────────────────────────────────────
+    # Pin to a plain int immediately — db.rollback() inside fetch_or_refresh_risks
+    # expires all ORM objects on this session, making lazy attribute access crash.
+    user_id: int = int(current_user.id)
 
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Shock simulation engine coming in Phase 4. "
-               "Run GET /api/v1/contingency/ first to see your fund plan.",
+    # ── 1. Vulnerability profile ──────────────────────────────────────────
+    profile = await build_vulnerability_profile(db, current_user, days=92)
+
+    # ── 2. Regional risk (Tavily → Gemini severity → DB cache) ───────────────────
+    regional_risks = await fetch_or_refresh_risks(db, shock_type)
+    regional_severity = max((r["severity"] for r in regional_risks), default=1)
+
+    # ── 3. Current fund progress ──────────────────────────────────────────
+    plan_result = await db.execute(
+        select(ContingencyPlan).where(ContingencyPlan.user_id == user_id)
     )
+    existing_plan = plan_result.scalar_one_or_none()
+    current_progress = existing_plan.current_progress if existing_plan else 0.0
+
+    # ── 4. Personalized shock simulation ──────────────────────────────────────
+    simulation = run_shock_simulation(
+        profile           = profile,
+        shock_type        = shock_type,
+        duration_months   = duration_months,
+        severity          = severity,
+        current_progress  = current_progress,
+        regional_severity = regional_severity,
+    )
+
+    # ── 5. Gemini narrative with full Malaysian context ────────────────────────
+    narrative = await generate_shock_narrative(simulation, profile, shock_type)
+
+    return {
+        **simulation,
+        **narrative,
+        "regional_risks": regional_risks[:3],
+    }
+
+
+# ─── GET /resilience-score ─────────────────────────────────────────────────────
+
+@router.get("/resilience-score")
+async def get_resilience_score(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Returns a composite 0–100 resilience score for the Resilience tab.
+
+    Sub-scores (weights):
+      buffer_score   30%  — progress toward a 3-month emergency fund
+      cashflow_score 30%  — monthly surplus as a fraction of income
+      risk_score     25%  — inverse of average active indicator severity
+      habits_score   15%  — savings consistency (fund transactions in last 6 months)
+    """
+    # Pin to plain int — avoids MissingGreenlet if session is expired mid-request
+    user_id: int = int(current_user.id)
+
+    plan_result = await db.execute(
+        select(ContingencyPlan).where(ContingencyPlan.user_id == user_id)
+    )
+    plan = plan_result.scalar_one_or_none()
+
+    if plan is None:
+        await calculate_plan(db, current_user)
+        plan_result = await db.execute(
+            select(ContingencyPlan).where(ContingencyPlan.user_id == user_id)
+        )
+        plan = plan_result.scalar_one_or_none()
+
+    if plan is None:
+        return {
+            "score": 0, "label": "Critical",
+            "sub_scores": {"buffer": 0, "cashflow": 0, "risk": 0, "habits": 0},
+            "description": "No financial data found yet. Add transactions to get started.",
+        }
+
+    # Buffer: progress toward a 3-month target
+    three_month_target = 3.0 * max(plan.avg_monthly_expense, 1.0)
+    buffer_score = min(plan.current_progress / three_month_target, 1.0) * 100
+
+    # Cashflow: surplus / income
+    avg_monthly_income = (plan.avg_monthly_expense or 0.0) + (plan.surplus or 0.0)
+    cashflow_score = (
+        min(max(plan.surplus / max(avg_monthly_income, 1.0), 0.0), 1.0) * 100
+        if avg_monthly_income > 0 else 0.0
+    )
+
+    # Risk: inverse of average fired-indicator score
+    indicators = plan.active_indicators or []
+    if indicators:
+        avg_ind = sum(i["score"] for i in indicators) / len(indicators)
+        risk_score = max(0.0, 1.0 - avg_ind) * 100
+    else:
+        risk_score = 85.0   # no fired indicators = healthy
+
+    # Habits: savings transactions in the last 6 months
+    six_months_ago = datetime.utcnow() - timedelta(days=180)
+    savings_count_result = await db.execute(
+        select(func.count()).where(
+            Transaction.user_id == user_id,
+            Transaction.type == "savings",
+            Transaction.category == "Emergency Fund",
+            Transaction.created_at >= six_months_ago,
+        )
+    )
+    savings_count = savings_count_result.scalar() or 0
+    habits_score = min(savings_count / 6.0, 1.0) * 100
+
+    # Composite
+    score = int(
+        0.30 * buffer_score + 0.30 * cashflow_score
+        + 0.25 * risk_score + 0.15 * habits_score
+    )
+    label = (
+        "Resilient"  if score >= 75 else
+        "Stable"     if score >= 50 else
+        "Vulnerable" if score >= 25 else
+        "Critical"
+    )
+
+    months_covered = round(plan.current_progress / max(plan.avg_monthly_expense, 1.0), 1)
+    if score >= 75:
+        desc = "Your financial safety net is strong. Keep building your fund."
+    elif score >= 50:
+        desc = "You have a reasonable buffer. Focus on growing your emergency fund."
+    elif score >= 25:
+        desc = f"Your buffer covers only {months_covered} months. Increase your monthly savings."
+    else:
+        desc = (
+            f"Critical: your fund covers less than 1 month of expenses. "
+            f"Start saving RM{plan.monthly_savings_target:.0f}/month immediately."
+        )
+
+    return {
+        "score":    score,
+        "label":    label,
+        "description": desc,
+        "sub_scores": {
+            "buffer":   round(buffer_score, 1),
+            "cashflow": round(cashflow_score, 1),
+            "risk":     round(risk_score, 1),
+            "habits":   round(habits_score, 1),
+        },
+        "target_amount":          plan.target_amount,
+        "current_progress":       plan.current_progress,
+        "monthly_savings_target": plan.monthly_savings_target,
+        "months_covered":         months_covered,
+    }

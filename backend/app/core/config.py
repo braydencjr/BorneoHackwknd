@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     EMAIL_PASSWORD: str | None = None
 
     GEMINI_API_KEY: str | None = None
+    TAVILY_API_KEY: str | None = None
 
     class Config:
         env_file = ".env"
