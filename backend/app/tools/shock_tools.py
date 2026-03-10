@@ -6,8 +6,11 @@ Tools exposed:
   simulate_shock          — rich multi-phase simulation with safety nets & survival actions
   stress_test_scenarios   — compare all 4 shock scenarios side-by-side
 """
+import asyncio
 import json
+import os
 from langchain.tools import tool
+from google import genai as _genai
 from app.tools.data_source import FinancialDataSource
 
 _ds = FinancialDataSource()
@@ -302,6 +305,119 @@ _SCENARIO_CONFIGS = {
 }
 
 
+async def _generate_scenario_config(profile, scenario: str) -> dict:
+    """
+    Ask Gemini to generate a personalised shock scenario config calibrated to this
+    user's real financial numbers. Falls back to _SCENARIO_CONFIGS if AI fails.
+    """
+    base = _SCENARIO_CONFIGS.get(scenario, _SCENARIO_CONFIGS["job_loss"])
+
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        try:
+            from app.core.config import Settings
+            api_key = Settings().GEMINI_API_KEY
+        except Exception:
+            pass
+    if not api_key:
+        return base
+
+    scenario_label = {
+        "illness": "Medical emergency / hospitalisation",
+        "job_loss": "Sudden job loss / retrenchment",
+        "disaster": "Natural disaster (flood / fire)",
+        "war": "Civil unrest / war / geopolitical crisis",
+    }.get(scenario, scenario)
+
+    prompt = f"""You are a Malaysian personal finance risk analyst.
+Generate a realistic, personalised financial shock scenario config for this user facing: {scenario_label}.
+
+User financial profile:
+- Monthly income: RM{profile.monthly_income:.2f}
+- Fixed expenses: RM{profile.fixed_expenses:.2f} (rent, loan, insurance)
+- Flexible expenses: RM{profile.flexible_expenses:.2f} (food, transport, entertainment)
+- Savings balance: RM{profile.savings_balance:.2f}
+- BNPL debt: RM{profile.bnpl_debt:.2f}
+- Credit card debt: RM{profile.credit_card_debt:.2f}
+- Dependents: {profile.dependents}
+- Risk profile: {profile.risk_profile}
+- Emergency fund coverage: {profile.emergency_fund_months:.1f} months
+
+Generate a JSON config with EXACTLY these fields, all RM amounts calibrated to this user:
+{{
+  "label": "Short 2-3 word scenario name",
+  "icon": "one of: medkit | briefcase | thunderstorm | shield",
+  "description": "1 sentence describing the shock",
+  "risk_probability": "1 sentence on likelihood (Malaysian context, cite a stat)",
+  "insurance_gap_note": "1 sentence on relevant gap coverage + estimated monthly cost",
+  "phases": [
+    {{
+      "id": "snake_case_id",
+      "label": "Phase Name",
+      "month_start": 1,
+      "month_end": 2,
+      "income_reduction": 0.7,
+      "extra_monthly_cost": 3500.0,
+      "flexible_multiplier": 0.4,
+      "description": "What happens in this phase"
+    }}
+  ],
+  "safety_nets": [
+    {{
+      "name": "Scheme / benefit name",
+      "monthly_amount": 800.0,
+      "note": "Eligibility and how to access it"
+    }}
+  ],
+  "survival_actions": [
+    {{
+      "action": "Concrete action name",
+      "monthly_impact": 800.0,
+      "type": "income | expense_cut | preparation",
+      "description": "1 sentence — how to do it today"
+    }}
+  ]
+}}
+
+Rules:
+- Phases must span months 1 through at least 6; set month_end=9999 for the last (open-ended) phase
+- income_reduction: 0.0 = no loss, 1.0 = total income loss
+- extra_monthly_cost: realistic RM amounts for Malaysian context
+- flexible_multiplier: 0.3 = survival mode, 1.0 = normal, 1.5 = panic/surge pricing
+- Include 2-3 phases, 2-3 safety nets (SOCSO / EPF / JKM / BPN relevant to this scenario), 3-5 survival actions
+- Calibrate all RM amounts to this user's income of RM{profile.monthly_income:.0f}/mo and savings of RM{profile.savings_balance:.0f}
+- Return ONLY valid JSON — no markdown fences, no explanation"""
+
+    try:
+        client = _genai.Client(api_key=api_key)
+        response = await client.aio.models.generate_content(
+            model="gemini-2.5-flash", contents=prompt
+        )
+        clean = response.text.strip()
+        if clean.startswith("```"):
+            clean = clean.split("```")[1]
+            if clean.startswith("json"):
+                clean = clean[4:]
+        clean = clean.strip()
+
+        generated = json.loads(clean)
+
+        required = {"label", "icon", "description", "risk_probability",
+                    "insurance_gap_note", "phases", "safety_nets", "survival_actions"}
+        if not required.issubset(generated.keys()):
+            print(f"[shock_tools] AI config missing keys for '{scenario}', using fallback")
+            return base
+        if len(generated["phases"]) < 2 or len(generated["survival_actions"]) < 2:
+            print(f"[shock_tools] AI config too sparse for '{scenario}', using fallback")
+            return base
+
+        return generated
+
+    except Exception as e:
+        print(f"[shock_tools] Gemini scenario generation failed for '{scenario}': {e}")
+        return base
+
+
 def _run_phase_simulation(profile, cfg: dict, months: int) -> tuple[list, float, float]:
     """
     Run a phased month-by-month simulation.
@@ -442,7 +558,7 @@ async def simulate_shock(scenario: str, months: int, user_id: str) -> str:
     - Risk probability and insurance gap
     """
     profile = await _ds.get_profile(user_id)
-    cfg = _SCENARIO_CONFIGS.get(scenario, _SCENARIO_CONFIGS["job_loss"])
+    cfg = await _generate_scenario_config(profile, scenario)
 
     timeline, avg_burn, avg_income = _run_phase_simulation(profile, cfg, months)
 
@@ -527,9 +643,15 @@ async def stress_test_scenarios(months: int, user_id: str) -> str:
     Returns a JSON summary with survival rates, fastest depletion, and safest scenario.
     """
     profile = await _ds.get_profile(user_id)
+
+    # Generate all 4 scenario configs in parallel via Gemini
+    scenario_ids = list(_SCENARIO_CONFIGS.keys())
+    configs = await asyncio.gather(
+        *[_generate_scenario_config(profile, sid) for sid in scenario_ids]
+    )
     results = []
 
-    for scenario_id, cfg in _SCENARIO_CONFIGS.items():
+    for scenario_id, cfg in zip(scenario_ids, configs):
         timeline, avg_burn, avg_income = _run_phase_simulation(profile, cfg, months)
         depletes_at = next((t["month"] for t in timeline if t["status"] == "depleted"), None)
         survives = depletes_at is None
