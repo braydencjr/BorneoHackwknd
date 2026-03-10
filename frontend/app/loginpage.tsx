@@ -86,7 +86,9 @@ export default function Login() {
             onChangeText={setPassword}
           />
 
-          <Text style={styles.forgot}>Forgot Password ?</Text>
+          <TouchableOpacity onPress={() => router.push("/forgotpassword")}>
+  <Text style={styles.forgot}>Forgot Password?</Text>
+</TouchableOpacity>
 
           {/* Confirm Button */}
           <TouchableOpacity

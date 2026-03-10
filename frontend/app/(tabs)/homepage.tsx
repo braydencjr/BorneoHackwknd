@@ -3,9 +3,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useState } from "react";
-import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import CategoryDonut from "../../components/category_donut";
 import DonutProgress from "../../components/donut_progress";
+const SCREEN_WIDTH = Dimensions.get("window").width;
 
 export default function HomePage() {
 
@@ -23,6 +24,9 @@ export default function HomePage() {
         });
 
         const data = await res.json();
+        console.log("Transactions API:", data);
+        console.log("INSIGHTS API:", data);
+        setTransactions(data.transactions ?? []);
 
         setUser(data);
 
@@ -44,9 +48,35 @@ export default function HomePage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [incomePercentage, setIncomePercentage] = useState(0);
   const [outcomePercentage, setOutcomePercentage] = useState(0);
-
+  const [insights, setInsights] = useState<InsightCard[]>([]);
   const [containerWidth, setContainerWidth] = useState(0);
   const indicatorPosition = useState(new Animated.Value(0))[0];
+
+  const fetchInsights = async () => {
+  try {
+    const token = await SecureStore.getItemAsync("accessToken");
+    if (!token) return;
+
+    const res = await fetch(`${BASE_URL}/api/v1/summary/suggestions`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const data = await res.json();
+
+    console.log("INSIGHTS API:", data);
+
+    setInsights(data.insights || []);
+
+  } catch (error) {
+    console.error("Failed to fetch insights:", error);
+  }
+};
+
+useFocusEffect(
+  useCallback(() => {
+    fetchInsights();
+  },[])
+);
 
   useFocusEffect(
     useCallback(() => {
@@ -102,6 +132,46 @@ export default function HomePage() {
       fetchTransactions();
     }, [])
   );
+
+  interface InsightCard {
+  type: "praise" | "warning" | "consequence" | "tip";
+  icon: string;
+  title: string;
+  body: string;
+}
+
+const INSIGHT_THEME: Record<InsightCard["type"], { bg: string; accent: string; icon_bg: string }> = {
+  praise: { bg: "#F0FDF4", accent: "#16A34A", icon_bg: "#DCFCE7" },
+  warning: { bg: "#FFFBEB", accent: "#D97706", icon_bg: "#FEF3C7" },
+  consequence: { bg: "#FFF1F2", accent: "#E11D48", icon_bg: "#FFE4E6" },
+  tip: { bg: "#EFF6FF", accent: "#1D4ED8", icon_bg: "#DBEAFE" },
+};
+
+interface InsightCard {
+  type: "praise" | "warning" | "consequence" | "tip";
+  icon: string;
+  title: string;
+  body: string;
+}
+
+  function InsightCardView({ item }: { item: InsightCard }) {
+    const theme = INSIGHT_THEME[item.type];
+    const label = { praise: "Great news", warning: "Heads up", consequence: "Watch out", tip: "Tip" }[item.type];
+    return (
+      <View style={[styles.insightCard, { borderLeftColor: theme.accent }]}>
+        <View style={[styles.insightIconBox, { backgroundColor: theme.icon_bg }]}>
+          <Text style={styles.insightIconText}>{item.icon}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.insightLabel, { color: theme.accent }]}>{label.toUpperCase()}</Text>
+          <Text style={styles.insightTitle}>{item.title}</Text>
+          <Text style={styles.insightBody}>{item.body}</Text>
+        </View>
+      </View>
+    );
+  }
+
+
 
   const tabData = {
     A: { percentage: percentage, color: "#7CB518", title: "Income vs Outcome" },
@@ -364,27 +434,24 @@ export default function HomePage() {
         </TouchableOpacity>
       </View>
 
+      {/* Financial Insights */}
+{insights.length > 0 && (
+  <View style={{ marginBottom: 20 }}>
+    <Text style={styles.sectionTitle}>Financial Insights</Text>
+    <Text style={styles.sectionSub}>Based on your last 30 days</Text>
 
-      {/* Savings Card */}
-      <View style={styles.card}>
-        <View style={styles.cardRow}>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Current Savings</Text>
-            <Text style={styles.amount}>RM 1000.00</Text>
-          </View>
-
-          <View style={styles.verticalDivider} />
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Tips for Savings</Text>
-            <Text style={styles.tip}>• Reduce dining out</Text>
-            <Text style={styles.tip}>• Track subscriptions</Text>
-          </View>
-
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+    >
+      {insights.map((item, i) => (
+        <View key={i} style={{ marginRight: 14 , marginTop : 10,}}>
+          <InsightCardView item={item} />
         </View>
-      </View>
-
+      ))}
+    </ScrollView>
+  </View>
+)}
 
       {/* Main Card */}
       <View style={{ marginTop: 40 }}>
@@ -594,8 +661,9 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    marginBottom: 10,
-    fontSize: 14,
+    marginBottom: 2,
+    fontSize: 20,
+    fontWeight: "bold",
   },
 
   progressBar: {
@@ -739,5 +807,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#666",
   },
+
+  sectionSub: { 
+  fontSize: 13, color: "#94A3B8", marginBottom: 12 },
+  insightCard: {
+  width: SCREEN_WIDTH * 0.85,
+  flexDirection: "row",
+  alignItems: "flex-start",
+  borderRadius: 16,
+  padding: 16,
+  backgroundColor: "#FFFFFF",
+  borderLeftWidth: 4,
+
+  shadowColor: "#000",
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.07,
+  shadowRadius: 6,
+  elevation: 2,
+},
+  insightIconBox: { width: 42, height: 42, borderRadius: 21, justifyContent: "center", alignItems: "center" },
+  insightIconText: { fontSize: 20 },
+  insightLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 1, marginBottom: 2 },
+  insightTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A", marginBottom: 3 },
+  insightBody: {
+  fontSize: 13,
+  color: "#475569",
+  lineHeight: 18,
+  flexShrink: 1
+},
+
 
 });

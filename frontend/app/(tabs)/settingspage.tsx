@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 
 
 export default function SettingsPage() {
@@ -12,7 +12,7 @@ export default function SettingsPage() {
 
   const [user, setUser] = useState<any>(null);
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
+  const [readNotifications, setReadNotifications] = useState(false);
 
   useFocusEffect(
   useCallback(() => {
@@ -73,14 +73,40 @@ console.log("TOKEN:", token);
 
         <View style={styles.row}>
           <View style={styles.rowLeft}>
-            <Ionicons name="moon-outline" size={20} color="#1E3A8A" />
-            <Text style={styles.rowText}>Dark Mode</Text>
+            <Ionicons name="alert" size={20} color="#1E3A8A" />
+            <Text style={styles.rowText}>Read Notifications  </Text>
+            <TouchableOpacity             
+             onPress={() => Alert.alert(
+                "Read Notifications",
+                "FinSight will read transaction-related notifications from supported banks and e-wallets to automatically detect your expenses. This feature requires notification access permission.",
+             ) }>
+            <Ionicons name="information-circle-outline" size={20} color="#1E3A8A" />
+            </TouchableOpacity>
           </View>
-          <Switch
-            value={darkMode}
-            onValueChange={setDarkMode}
-            trackColor={{ true: "#1E3A8A" }}
-          />
+            <Switch
+    value={readNotifications}
+    onValueChange={(value) => {
+      if (value) {
+        Alert.alert(
+          "Enable Notification Reading",
+          "FinSight will read transaction-related notifications from supported banks and e-wallets to automatically detect your expenses.",
+          [
+            {
+              text: "Cancel",
+              style: "cancel"
+            },
+            {
+              text: "Enable",
+              onPress: () => setReadNotifications(true)
+            }
+          ]
+        );
+      } else {
+        setReadNotifications(false);
+      }
+    }}
+    trackColor={{ true: "#1E3A8A" }}
+  />
         </View>
       </View>
 
@@ -102,13 +128,16 @@ console.log("TOKEN:", token);
 
         <View style={styles.divider} />
 
-        <TouchableOpacity style={styles.row}>
-          <View style={styles.rowLeft}>
-            <Ionicons name="lock-closed-outline" size={20} color="#1E3A8A" />
-            <Text style={styles.rowText}>Change Password</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#999" />
-        </TouchableOpacity>
+        <TouchableOpacity
+  style={styles.row}
+  onPress={() => router.push("/changepassword")}
+>
+  <View style={styles.rowLeft}>
+    <Ionicons name="lock-closed-outline" size={20} color="#1E3A8A" />
+    <Text style={styles.rowText}>Change Password</Text>
+  </View>
+  <Ionicons name="chevron-forward" size={18} color="#999" />
+</TouchableOpacity>
 
         <View style={styles.divider} />
 
