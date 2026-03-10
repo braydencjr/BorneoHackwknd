@@ -221,3 +221,30 @@ async def suggest_actions(chips: list[str]) -> str:
         "chips": chips[:4],  # cap at 4 so the UI doesn't overflow
     }
     return json.dumps(data)
+
+
+@tool
+async def show_analysis(
+    overall_standing: list[str],
+    emergency_buffer: list[str],
+    debt_load: list[str],
+    monthly_cash_flow: list[str],
+    spending_habits: list[str],
+    priority_action: list[str],
+) -> str:
+    """
+    Store the structured AI analysis with per-section bullet insights.
+    Call this LAST, after all four diagnostic tools have completed.
+    Pass exactly 2 short bullet strings per parameter — one key fact, one implication
+    or action. Each bullet must be a complete sentence of 20 words or fewer.
+    """
+    data = {
+        "card": "analysis",
+        "overall_standing": overall_standing[:2],
+        "emergency_buffer": emergency_buffer[:2],
+        "debt_load": debt_load[:2],
+        "monthly_cash_flow": monthly_cash_flow[:2],
+        "spending_habits": spending_habits[:2],
+        "priority_action": priority_action[:2],
+    }
+    return json.dumps(data)

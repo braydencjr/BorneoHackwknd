@@ -22,6 +22,7 @@ from app.tools.financial_tools import (
     show_resilience_score,
     trigger_emergency_alert,
     show_savings_plan,
+    show_analysis,
 )
 from app.agents.prompts.finsight_overview import FINSIGHT_OVERVIEW_SYSTEM_PROMPT
 
@@ -35,6 +36,7 @@ _TOOL_CARD_MAP = {
     "show_resilience_score":   "score",
     "trigger_emergency_alert": "alert",
     "show_savings_plan":       "plan",
+    "show_analysis":           "analysis",
 }
 
 _TOOL_STEP_LABELS = {
@@ -42,6 +44,7 @@ _TOOL_STEP_LABELS = {
     "show_resilience_score":   "Calculating resilience score…",
     "trigger_emergency_alert": "Checking emergency signals…",
     "show_savings_plan":       "Building savings plan…",
+    "show_analysis":           "Writing insights…",
 }
 
 
@@ -88,6 +91,7 @@ def _get_overview_agent():
                 show_resilience_score,
                 trigger_emergency_alert,
                 show_savings_plan,
+                show_analysis,
             ],
             system_prompt=FINSIGHT_OVERVIEW_SYSTEM_PROMPT,
             # No checkpointer → stateless: each invoke is a fresh execution

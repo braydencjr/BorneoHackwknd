@@ -87,18 +87,19 @@ export function useOverviewScan() {
           if (!d) break;
           setState((prev) => {
             switch (d.card) {
-              case 'vitals': return { ...prev, vitals: d };
-              case 'score':  return { ...prev, score: d };
-              case 'alert':  return { ...prev, alert: d };
-              case 'plan':   return { ...prev, plan: d };
-              default:       return prev;
+              case 'vitals':   return { ...prev, vitals: d };
+              case 'score':    return { ...prev, score: d };
+              case 'alert':    return { ...prev, alert: d };
+              case 'plan':     return { ...prev, plan: d };
+              case 'analysis': return { ...prev, analysis: d as AnalysisData };
+              default:         return prev;
             }
           });
           break;
         }
 
         case 'text':
-          setState((prev) => ({ ...prev, analysis: prev.analysis + (event.content ?? '') }));
+          // analysis is now structured via show_analysis tool — text tokens ignored
           break;
 
         case 'error':
@@ -237,6 +238,10 @@ export function useOverviewScan() {
         const cached = await AsyncStorage.getItem(CACHE_KEY);
         if (cached && !cancelled) {
           const data: OverviewCacheEntry = JSON.parse(cached);
+          // Migrate old string analysis (pre-structured-output) to null
+          if (typeof (data as any).analysis === 'string') {
+            (data as any).analysis = null;
+          }
           const age = Date.now() - (data.timestamp ?? 0);
           if (age < CACHE_TTL_MS && data.vitals && data.score) {
             setState({

@@ -47,7 +47,7 @@ import {
   type StressTestData,
   type VitalsData,
 } from '@/hooks/use-resilience-stream';
-import { useOverviewScan } from '@/hooks/use-overview-scan';
+import { useOverviewScan, type AnalysisData } from '@/hooks/use-overview-scan';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const T = {
@@ -417,7 +417,19 @@ function OverviewSkeleton({ step }: { step: string }) {
 }
 
 // ─── Score ring card ──────────────────────────────────────────────────────────
-function ScoreRingCard({ score }: { score: ScoreData }) {
+function ScoreRingCard({
+  score,
+  insights,
+  isLoading,
+  timestamp,
+  onRefresh,
+}: {
+  score: ScoreData;
+  insights?: string[] | null;
+  isLoading?: boolean;
+  timestamp?: number;
+  onRefresh?: () => void;
+}) {
   const tierColor =
     score.tier === 'strong' ? T.green : score.tier === 'moderate' ? T.amber : T.red;
   const tierLabel =
@@ -440,6 +452,8 @@ function ScoreRingCard({ score }: { score: ScoreData }) {
     { label: 'Cash Flow', value: score.dimensions.cashflow },
     { label: 'Habits',    value: score.dimensions.habits },
   ];
+
+  const timeAgo = timestamp && timestamp > 0 ? formatTimeAgo(timestamp) : null;
 
   return (
     <Animated.View style={[ovStyles.card, ovStyles.scoreCard, { borderColor: tierColor + '28', opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
@@ -476,12 +490,47 @@ function ScoreRingCard({ score }: { score: ScoreData }) {
           </View>
         </View>
       </View>
+
+      {/* AI insights — overall standing */}
+      {insights && insights.length > 0 && (
+        <View style={ovStyles.insightSection}>
+          <View style={ovStyles.insightDivider} />
+          {insights.map((bullet, i) => (
+            <View key={i} style={ovStyles.insightRow}>
+              <Text style={[ovStyles.insightDot, { color: tierColor }]}>•</Text>
+              <Text style={ovStyles.insightText}>{bullet}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      {isLoading && !insights && (
+        <View style={ovStyles.insightSection}>
+          <View style={ovStyles.insightDivider} />
+          <View style={ovStyles.insightLoadingRow}>
+            <ActivityIndicator size="small" color={T.textMuted} />
+            <Text style={ovStyles.insightLoadingText}>Analyzing your finances…</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Refresh footer */}
+      {!isLoading && onRefresh && (
+        <View style={ovStyles.scoreFooter}>
+          {timeAgo ? (
+            <Text style={ovStyles.scoreFooterTime}>Analyzed {timeAgo}</Text>
+          ) : <View />}
+          <Pressable onPress={onRefresh} style={ovStyles.refreshBtn} hitSlop={8}>
+            <Ionicons name="refresh-outline" size={13} color={T.textMuted} />
+            <Text style={ovStyles.refreshBtnText}>Refresh</Text>
+          </Pressable>
+        </View>
+      )}
     </Animated.View>
   );
 }
 
 // ─── 2×2 Metrics grid ────────────────────────────────────────────────────────
-function MetricsGrid({ vitals }: { vitals: VitalsData }) {
+function MetricsGrid({ vitals, analysis }: { vitals: VitalsData; analysis: AnalysisData | null }) {
   const metrics = [
     {
       icon: '🛡️',
@@ -489,6 +538,7 @@ function MetricsGrid({ vitals }: { vitals: VitalsData }) {
       value: `${vitals.buffer_months}mo`,
       status: vitals.buffer_status,
       bench: '3+ mo safe',
+      insights: analysis?.emergency_buffer,
     },
     {
       icon: '💳',
@@ -496,6 +546,7 @@ function MetricsGrid({ vitals }: { vitals: VitalsData }) {
       value: `${vitals.debt_pressure}%`,
       status: vitals.debt_status,
       bench: '<30% healthy',
+      insights: analysis?.debt_load,
     },
     {
       icon: '💰',
@@ -503,6 +554,7 @@ function MetricsGrid({ vitals }: { vitals: VitalsData }) {
       value: `+RM${vitals.cashflow_monthly.toLocaleString()}`,
       status: vitals.cashflow_status,
       bench: 'surplus/mo',
+      insights: analysis?.monthly_cash_flow,
     },
     {
       icon: '📊',
@@ -510,12 +562,13 @@ function MetricsGrid({ vitals }: { vitals: VitalsData }) {
       value: `${vitals.habit_score}/100`,
       status: vitals.habit_status,
       bench: '65+ is good',
+      insights: analysis?.spending_habits,
     },
   ];
 
   return (
     <View style={ovStyles.metricsGrid}>
-      {metrics.map(({ icon, label, value, status, bench }, idx) => {
+      {metrics.map(({ icon, label, value, status, bench, insights }, idx) => {
         const color = STATUS_COLORS[status as keyof typeof STATUS_COLORS];
         const delay = idx * 60;
         return (
@@ -528,6 +581,7 @@ function MetricsGrid({ vitals }: { vitals: VitalsData }) {
             status={status}
             bench={bench}
             delay={delay}
+            insights={insights}
           />
         );
       })}
@@ -536,10 +590,11 @@ function MetricsGrid({ vitals }: { vitals: VitalsData }) {
 }
 
 function MetricGridCell({
-  icon, label, value, color, status, bench, delay,
+  icon, label, value, color, status, bench, delay, insights,
 }: {
   icon: string; label: string; value: string; color: string;
   status: string; bench: string; delay: number;
+  insights?: string[] | null;
 }) {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -556,95 +611,20 @@ function MetricGridCell({
         <Text style={[ovStyles.metricCellStatus, { color }]}>{status.toUpperCase()}</Text>
       </View>
       <Text style={ovStyles.metricCellBench}>{bench}</Text>
+      {insights && insights.length > 0 && (
+        <View style={ovStyles.metricInsightBox}>
+          {insights.map((b, i) => (
+            <Text key={i} style={ovStyles.metricInsightText}>{b}</Text>
+          ))}
+        </View>
+      )}
     </Animated.View>
   );
 }
 
 // ─── AI Analysis card ─────────────────────────────────────────────────────────
-function AnalysisCard({
-  analysis,
-  isLoading,
-  currentStep,
-  timestamp,
-  onRefresh,
-}: {
-  analysis: string;
-  isLoading: boolean;
-  currentStep: string;
-  timestamp: number;
-  onRefresh: () => void;
-}) {
-  const cursorAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (isLoading && analysis) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(cursorAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
-          Animated.timing(cursorAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      cursorAnim.setValue(0);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, analysis]);
-
-  const timeAgo = timestamp > 0 ? formatTimeAgo(timestamp) : null;
-
-  return (
-    <View style={ovStyles.analysisCard}>
-      {/* Header */}
-      <View style={ovStyles.analysisHeader}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontSize: 18 }}>🤖</Text>
-          <Text style={ovStyles.analysisTitle}>FinSight Analysis</Text>
-        </View>
-        {isLoading && currentStep ? (
-          <View style={ovStyles.analysisStepBadge}>
-            <ActivityIndicator size="small" color="rgba(147,197,253,0.8)" style={{ marginRight: 5 }} />
-            <Text style={ovStyles.analysisStepText}>{currentStep}</Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* Body */}
-      {isLoading && !analysis ? (
-        <View style={ovStyles.analysisPlaceholder}>
-          <ActivityIndicator size="small" color="rgba(147,197,253,0.6)" />
-          <Text style={ovStyles.analysisPlaceholderText}>
-            Analyzing your financial health…
-          </Text>
-        </View>
-      ) : (
-        <Text style={ovStyles.analysisBody}>
-          {analysis}
-          {isLoading ? (
-            <Animated.Text style={{ opacity: cursorAnim, color: '#7DD3FC' }}>▋</Animated.Text>
-          ) : null}
-        </Text>
-      )}
-
-      {/* Footer */}
-      <View style={ovStyles.analysisFooter}>
-        {timeAgo ? (
-          <Text style={ovStyles.analysisFooterTime}>Analyzed {timeAgo}</Text>
-        ) : (
-          <View />
-        )}
-        {!isLoading && (
-          <Pressable onPress={onRefresh} style={ovStyles.refreshBtn} hitSlop={8}>
-            <Ionicons name="refresh-outline" size={13} color="rgba(147,197,253,0.7)" />
-            <Text style={ovStyles.refreshBtnText}>Refresh</Text>
-          </Pressable>
-        )}
-      </View>
-    </View>
-  );
-}
-
 // ─── Savings best-tier snapshot ───────────────────────────────────────────────
-function SavingsBestTier({ plan }: { plan: PlanData }) {
+function SavingsBestTier({ plan, insights }: { plan: PlanData; insights?: string[] | null }) {
   const balanced = plan.tiers.find((t) => t.id === 'balanced') ?? plan.tiers[0];
   if (!balanced) return null;
 
@@ -673,6 +653,17 @@ function SavingsBestTier({ plan }: { plan: PlanData }) {
         </View>
       </View>
       <Text style={ovStyles.savingsNote}>{balanced.sacrifice}</Text>
+      {insights && insights.length > 0 && (
+        <View style={ovStyles.insightSection}>
+          <View style={[ovStyles.insightDivider, { borderTopColor: T.amber + '44' }]} />
+          {insights.map((b, i) => (
+            <View key={i} style={ovStyles.insightRow}>
+              <Text style={[ovStyles.insightDot, { color: T.amber }]}>•</Text>
+              <Text style={[ovStyles.insightText, { color: T.textSecondary }]}>{b}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -845,23 +836,25 @@ export default function ResiliencePage() {
             // At least score is available — render dashboard
             <View style={styles.dashboardSection}>
               {overviewScan.score && (
-                <ScoreRingCard score={overviewScan.score} />
+                <ScoreRingCard
+                  score={overviewScan.score}
+                  insights={overviewScan.analysis?.overall_standing}
+                  isLoading={overviewScan.isLoading}
+                  timestamp={overviewScan.timestamp}
+                  onRefresh={overviewScan.refresh}
+                />
               )}
               {overviewScan.vitals && (
-                <MetricsGrid vitals={overviewScan.vitals} />
+                <MetricsGrid vitals={overviewScan.vitals} analysis={overviewScan.analysis} />
               )}
               {overviewScan.alert && (
                 <AlertStrip alert={overviewScan.alert} />
               )}
-              <AnalysisCard
-                analysis={overviewScan.analysis}
-                isLoading={overviewScan.isLoading}
-                currentStep={overviewScan.currentStep}
-                timestamp={overviewScan.timestamp}
-                onRefresh={overviewScan.refresh}
-              />
               {overviewScan.plan && (
-                <SavingsBestTier plan={overviewScan.plan} />
+                <SavingsBestTier
+                  plan={overviewScan.plan}
+                  insights={overviewScan.analysis?.priority_action}
+                />
               )}
             </View>
           )}
@@ -1647,15 +1640,83 @@ const ovStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: T.surfaceRaised,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
   },
   refreshBtnText: {
     fontSize: 11,
-    color: 'rgba(147,197,253,0.7)',
+    color: T.textMuted,
     fontWeight: '600',
+  },
+
+  // ── Score card footer ──
+  scoreFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: T.border,
+  },
+  scoreFooterTime: {
+    fontSize: 11,
+    color: T.textMuted,
+    fontWeight: '500',
+  },
+
+  // ── Insight list (shared across cards) ──
+  insightSection: {
+    gap: 5,
+  },
+  insightDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: T.border,
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 5,
+  },
+  insightDot: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: T.accent,
+  },
+  insightText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 18,
+    color: T.textSecondary,
+  },
+  insightLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  insightLoadingText: {
+    fontSize: 12,
+    color: T.textMuted,
+    fontStyle: 'italic',
+  },
+
+  // ── Metric cell insights ──
+  metricInsightBox: {
+    marginTop: 6,
+    gap: 3,
+    width: '100%',
+  },
+  metricInsightText: {
+    fontSize: 10,
+    lineHeight: 14,
+    color: T.textMuted,
+    textAlign: 'center',
   },
 
   // ── Savings best-tier ──
