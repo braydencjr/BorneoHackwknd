@@ -169,7 +169,11 @@ export default function HomePage() {
     { key: "D", label: "Transactions", icon: "receipt-outline" },
   ] as const;
 
-  const tabWidth = containerWidth / tabs.length;
+  const TABS_SIDE_PADDING = 15;
+  const tabWidth =
+    Math.max(containerWidth - TABS_SIDE_PADDING * 2, 0) / tabs.length;
+  const indicatorWidth = tabWidth * 0.5;
+  const indicatorBaseLeft = TABS_SIDE_PADDING + (tabWidth - indicatorWidth) / 2;
 
   function getMerchantCode(name: string) {
     if (!name) return "TXN";
@@ -663,8 +667,8 @@ export default function HomePage() {
               style={[
                 styles.indicator,
                 {
-                  width: tabWidth * 0.5,
-                  left: tabWidth * 0.25,
+                  width: indicatorWidth,
+                  left: indicatorBaseLeft,
                   transform: [{ translateX: indicatorPosition }],
                 },
               ]}
@@ -673,7 +677,7 @@ export default function HomePage() {
             {tabs.map((tab) => (
               <TouchableOpacity
                 key={tab.key}
-                style={styles.tabButton}
+                style={[styles.tabButton, { width: `${100 / tabs.length}%` }]}
                 onPress={() => {
                   setSelectedTab(tab.key);
 
@@ -688,13 +692,13 @@ export default function HomePage() {
                 <Ionicons
                   name={tab.icon as any}
                   size={22}
-                  color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
+                  color={selectedTab === tab.key ? "#FFFFFF" : "#BFDBFE"}
                 />
 
                 <Text
                   style={[
                     styles.tabLabel,
-                    selectedTab === tab.key && { color: "#1E3A8A" },
+                    selectedTab === tab.key && styles.tabLabelActive,
                   ]}
                 >
                   {tab.label}
@@ -798,10 +802,9 @@ const styles = StyleSheet.create({
   progressTabs: {
     position: "absolute",
     top: -25, // makes it float into card
-    left: 40,
-    right: 40,
+    left: 0,
+    right: 0,
     flexDirection: "row",
-    justifyContent: "space-between",
     backgroundColor: "#1E3A8A",
     padding: 15,
     borderRadius: 25,
@@ -869,23 +872,28 @@ const styles = StyleSheet.create({
   indicator: {
     position: "absolute",
     bottom: 6, // sit near bottom
-    height: 1, // thin underline
-    backgroundColor: "#FFFFFF",
+    height: 2,
+    backgroundColor: "#FDE68A",
     borderRadius: 2,
   },
 
   tabButton: {
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
     zIndex: 2,
   },
 
   tabLabel: {
     fontSize: 11,
     marginTop: 4,
-    color: "#FFFFFF",
+    color: "#BFDBFE",
     textAlign: "center",
+  },
+
+  tabLabelActive: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 
   activeTabLabel: {
