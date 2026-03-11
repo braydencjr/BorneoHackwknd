@@ -1,30 +1,30 @@
 import {
-    hasConsent,
-    isNotificationAccessEnabled,
+  hasConsent,
+  isNotificationAccessEnabled,
 } from "@/services/notificationService";
 import { useGoogleAuth } from "@/services/useGoogleAuth";
 import { AntDesign } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    TouchableWithoutFeedback,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
 } from "react-native";
 import { authService } from "../services/authService";
 
 export default function Login() {
-  const { request, response, promptAsync } = useGoogleAuth();
+  const { request, response, promptAsync, isConfigured } = useGoogleAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -153,17 +153,19 @@ export default function Login() {
 
           <Text style={styles.signInWith}>Sign in With :</Text>
 
-          <TouchableOpacity
-            style={[
-              styles.googleButton,
-              (!request || loading) && { opacity: 0.6 },
-            ]}
-            disabled={!request || loading}
-            onPress={() => promptAsync()}
-          >
-            <AntDesign name="google" size={22} color="white" />
-            <Text style={styles.googleText}>Sign in with Google</Text>
-          </TouchableOpacity>
+          {isConfigured && (
+              <TouchableOpacity
+                  style={[
+                      styles.googleButton,
+                      (!request || loading) && { opacity: 0.6 },
+                  ]}
+                  disabled={!request || loading}
+                  onPress={() => promptAsync()}
+              >
+                  <AntDesign name="google" size={22} color="white" />
+                  <Text style={styles.googleText}>Sign in with Google</Text>
+              </TouchableOpacity>
+          )}
 
           {/* Sign Up Button */}
           <TouchableOpacity

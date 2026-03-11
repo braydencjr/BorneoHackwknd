@@ -1,4 +1,4 @@
-package com.borneohackwknd.app
+package com.brayden.borneohackwknd
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

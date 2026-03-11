@@ -63,12 +63,21 @@ export default function HomePage() {
   const [selectedTab, setSelectedTab] = useState<"A" | "B" | "C" | "D">("A");
   const [income, setIncome] = useState(0);
   const [outcome, setOutcome] = useState(0);
+const [percentage, setPercentage] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [incomePercentage, setIncomePercentage] = useState(0);
   const [outcomePercentage, setOutcomePercentage] = useState(0);
 
   const [containerWidth, setContainerWidth] = useState(0);
   const indicatorPosition = useState(new Animated.Value(0))[0];
+
+  const [fundPlan, setFundPlan] = useState<{
+    current_progress: number;
+    target_amount: number;
+    progress_percentage: number;
+    months_to_goal: number | null;
+    monthly_savings_target: number;
+  } | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -122,7 +131,7 @@ export default function HomePage() {
       };
 
       fetchTransactions();
-    }, []),
+    }, [])
   );
 
   useFocusEffect(
@@ -131,22 +140,18 @@ export default function HomePage() {
         try {
           setAiInsightsLoading(true);
           setAiInsights([]);
-
           const token = await SecureStore.getItemAsync("accessToken");
           if (!token) {
             setAiInsightsLoading(false);
             return;
           }
-
           const res = await fetch(`${BASE_URL}/api/v1/summary/suggestions`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-
           if (!res.ok) {
             setAiInsights([]);
             return;
           }
-
           const data = await res.json();
           const cards = (data?.cards || [])
             .filter((card: any) => card?.body)
@@ -156,7 +161,6 @@ export default function HomePage() {
               body: String(card.body),
               isPositive: Boolean(card.isPositive),
             }));
-
           setAiInsights(cards);
         } catch (error) {
           console.error("Failed to fetch AI insight:", error);
@@ -166,9 +170,32 @@ export default function HomePage() {
         }
       };
 
+      const fetchFundPlan = async () => {
+        try {
+          const token = await SecureStore.getItemAsync("accessToken");
+          if (!token) return;
+          const res = await fetch(`${BASE_URL}/api/v1/contingency/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) return;
+          const data = await res.json();
+          setFundPlan(data);
+        } catch (error) {
+          console.error("Failed to fetch fund plan:", error);
+        }
+      };
+
       fetchAiInsight();
-    }, []),
+      fetchFundPlan();
+    }, [])
   );
+
+  const tabData = {
+    A: { percentage: percentage, color: "#7CB518", title: "Income vs Outcome" },
+    B: { percentage: 60, color: "#4C8DAE", title: "Income" },
+    C: { percentage: 46, color: "#F59E0B", title: "Outcome" },
+    D: { percentage: 22, color: "#E4572E", title: "Transactions" },
+  };
 
   const tabs = [
     { key: "A", label: "Overview", icon: "grid-outline" },
@@ -393,6 +420,7 @@ export default function HomePage() {
         <View>
           {transactions.map((t) => {
             const isIncome = t.type == "income";
+            const isSavings = t.type == "savings";
 
             return (
               <View key={t.id} style={styles.transactionRow}>
@@ -404,9 +432,9 @@ export default function HomePage() {
                     ]}
                   >
                     <Ionicons
-                      name={isIncome ? "arrow-down" : "arrow-up"}
+                      name={isSavings ? "shield-checkmark-outline" : isIncome ? "arrow-down" : "arrow-up"}
                       size={16}
-                      color={isIncome ? "#16A34A" : "#DC2626"}
+                      color={isSavings ? "#1E3A8A" : isIncome ? "#16A34A" : "#DC2626"}
                     />
                   </View>
 
@@ -430,9 +458,10 @@ export default function HomePage() {
                       { color: isIncome ? "#16A34A" : "#DC2626" },
                     ]}
                   >
-                    {isIncome ? "+" : "-"} RM{Math.abs(t.amount).toFixed(2)}
+                    {isSavings ? "\u2192 Fund" : isIncome ? "+" : "-"} RM{Math.abs(t.amount).toFixed(2)}
                   </Text>
 
+                  {!isSavings && (
                   <TouchableOpacity
                     style={styles.receiptButton}
                     onPress={() =>
@@ -444,6 +473,8 @@ export default function HomePage() {
                   >
                     <Text style={styles.receiptText}>View</Text>
                   </TouchableOpacity>
+                  )}
+
                 </View>
               </View>
             );
@@ -659,6 +690,41 @@ export default function HomePage() {
           </View>
         </View>
       </View>
+
+
+      {/* Main Card */}
+      {fundPlan && (
+        <View style={styles.fundWidget}>
+          <View style={styles.fundWidgetHeader}>
+            <Ionicons name="shield-checkmark-outline" size={16} color="#1E3A8A" />
+            <Text style={styles.fundWidgetTitle}>Emergency Fund</Text>
+            {fundPlan.months_to_goal !== null && (
+              <View style={styles.fundBadge}>
+                <Text style={styles.fundBadgeText}>~{fundPlan.months_to_goal} mo to goal</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.progressBar}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${Math.min(fundPlan.progress_percentage, 100)}%` },
+              ]}
+            />
+          </View>
+          <View style={styles.fundWidgetFooter}>
+            <Text style={styles.fundWidgetSaved}>
+              RM{fundPlan.current_progress.toFixed(2)} saved
+            </Text>
+            <Text style={styles.fundWidgetTarget}>
+              of RM{fundPlan.target_amount.toFixed(2)} · {fundPlan.progress_percentage.toFixed(0)}%
+            </Text>
+          </View>
+          <Text style={styles.fundWidgetHint}>
+            Monthly saving goal: RM{fundPlan.monthly_savings_target.toFixed(2)}
+          </Text>
+        </View>
+      )}
 
       {/* Main Card */}
       <View style={{ marginTop: 40 }}>
@@ -1154,4 +1220,63 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#334155",
   },
+  fundWidget: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+
+  fundWidgetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 6,
+  },
+
+  fundWidgetTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E3A8A",
+    flex: 1,
+  },
+
+  fundBadge: {
+    backgroundColor: "#1E3A8A",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+
+  fundBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  fundWidgetFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+
+  fundWidgetSaved: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1E3A8A",
+  },
+
+  fundWidgetTarget: {
+    fontSize: 12,
+    color: "#64748B",
+  },
+
+  fundWidgetHint: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  },
+
 });

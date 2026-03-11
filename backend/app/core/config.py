@@ -40,19 +40,18 @@ class Settings(BaseSettings):
     EMAIL_ADDRESS: str | None = None
     EMAIL_PASSWORD: str | None = None
 
-    # Gemini AI — set GEMINI_API_KEY in .env
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash"
-
-    # Anthropic Claude — optional; used for educator subagent if set
-    CLAUDE_API_KEY: str = ""
+    TAVILY_API_KEY: str | None = None
+    CLAUDE_API_KEY: str | None = None
     CLAUDE_MODEL: str = "claude-sonnet-4-6"
 
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"   # ignore extra env variables like EXPO_PUBLIC_*
+        extra="ignore"  
     )
+
 
 @lru_cache
 def get_settings() -> Settings:

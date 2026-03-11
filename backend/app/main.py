@@ -11,7 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.routes import health, auth, resilience, transactions, summary, notifications, spending
+import app.models  # noqa: F401 — registers all ORM models with Base.metadata
+
+from app.routes import health, auth, resilience, transactions, summary,  notifications, contingency, spending
 
 settings = get_settings()
 
@@ -62,6 +64,5 @@ app.include_router(transactions.router,prefix="/api/v1/transactions",tags=["tran
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(resilience.router, prefix="/api/v1/resilience", tags=["resilience"])
 app.include_router(summary.router, prefix="/api/v1/summary", tags=["summary"])
-
-
+app.include_router(contingency.router, prefix="/api/v1/contingency", tags=["contingency"])
 app.include_router(spending.router,  prefix="/api/v1/spending",  tags=["spending"])
