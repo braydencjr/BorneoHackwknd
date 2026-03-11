@@ -1,4 +1,5 @@
 import { BASE_URL } from "@/services/api";
+import { authService } from "@/services/authService";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
@@ -31,15 +32,22 @@ export default function HomePage() {
     useCallback(() => {
       const fetchUser = async () => {
         try {
-          const token = await SecureStore.getItemAsync("accessToken");
-          if (!token) return;
+//           const token = await SecureStore.getItemAsync("accessToken");
+//           if (!token) return;
 
-          const res = await fetch(`${BASE_URL}/api/v1/auth/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+//           const res = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+//             headers: { Authorization: `Bearer ${token}` },
+//           });
 
-          const data = await res.json();
+//           const data = await res.json();
+          
+          // TODO: Determine which works, currently default to the code from the main branch
 
+          const data = await authService.me();
+          if (!data) {
+            router.replace("/loginpage");
+            return;
+          }
           setUser(data);
         } catch (error) {
           console.error("Failed to fetch user:", error);

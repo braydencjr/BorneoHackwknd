@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.routes import health, auth, resilience, transactions, summary, spending
+from app.routes import health, auth, resilience, transactions, summary, notifications, spending
 
 settings = get_settings()
 
@@ -37,21 +37,30 @@ app = FastAPI(
 # CORS — allow Expo web (localhost:19006) and your dev machine LAN IP.
 # Tighten allow_origins in production to your real domain only.
 # ---------------------------------------------------------------------------
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_origins = settings.ALLOWED_ORIGINS
+cors_kwargs = {
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+
+# `*` + credentials can behave inconsistently across clients/browsers.
+# Use regex wildcard when "allow all" is requested.
+if "*" in cors_origins:
+    cors_kwargs["allow_origin_regex"] = ".*"
+else:
+    cors_kwargs["allow_origins"] = cors_origins
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 # ---------------------------------------------------------------------------
 # Routers — all endpoints live under /api/v1 for versioning
 # ---------------------------------------------------------------------------
-app.include_router(health.router,    prefix="/api/v1/health",    tags=["health"])
-app.include_router(auth.router,      prefix="/api/v1/auth",      tags=["auth"])
+app.include_router(health.router, prefix="/api/v1/health", tags=["health"])
+app.include_router(auth.router,   prefix="/api/v1/auth",   tags=["auth"])
+app.include_router(transactions.router,prefix="/api/v1/transactions",tags=["transactions"],)
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["notifications"])
 app.include_router(resilience.router, prefix="/api/v1/resilience", tags=["resilience"])
-app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
 app.include_router(summary.router, prefix="/api/v1/summary", tags=["summary"])
 
 

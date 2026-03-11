@@ -39,9 +39,10 @@ yarn-error.*
 app-example
 
 # generated native folders
-/ios
-/android
+frontend/ios
+frontend/android
 /.vscode
+frontend/android/local.properties
 
 # ── Backend (FastAPI / Python) ────────────────────────────────────────────────
 __pycache__/
@@ -84,3 +85,4 @@ frontend/.env
 **/.otp_store.json
 
 # package-lock is fine to commit for reproducibility, but ignore services/ dir if local only
+/services/

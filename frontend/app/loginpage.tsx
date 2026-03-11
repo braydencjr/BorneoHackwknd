@@ -1,8 +1,26 @@
+import {
+    hasConsent,
+    isNotificationAccessEnabled,
+} from "@/services/notificationService";
 import { useGoogleAuth } from "@/services/useGoogleAuth";
 import { AntDesign } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    TouchableWithoutFeedback,
+    View,
+} from "react-native";
 import { authService } from "../services/authService";
 
 export default function Login() {
@@ -22,10 +40,32 @@ export default function Login() {
 
     try {
       setLoading(true);
-      await authService.login({ username: email.trim().toLowerCase(), password });
+      await authService.login({
+        username: email.trim().toLowerCase(),
+        password,
+      });
+
+      if (Platform.OS === "android") {
+        const [consentGranted, accessEnabled] = await Promise.all([
+          hasConsent(),
+          isNotificationAccessEnabled(),
+        ]);
+
+        if (!consentGranted || !accessEnabled) {
+          router.replace({
+            pathname: "/notification-consent",
+            params: { next: "/(tabs)/homepage" },
+          });
+          return;
+        }
+      }
+
       router.replace("/(tabs)/homepage");
     } catch (error: any) {
-      Alert.alert("Login failed", error.message ?? "Invalid email or password.");
+      Alert.alert(
+        "Login failed",
+        error.message ?? "Invalid email or password.",
+      );
     } finally {
       setLoading(false);
     }
@@ -35,12 +75,17 @@ export default function Login() {
   useEffect(() => {
     const handleGoogleLogin = async () => {
       if (response?.type === "success") {
-        // Google auth succeeded in Expo Go — navigate to home.
-        // For a full backend JWT flow, pass response.authentication?.idToken
-        // to your backend Google route once it's implemented.
-        router.replace("/(tabs)/homepage");
+        // Native Google sign-in succeeded, but app JWT tokens are not issued yet.
+        // Keep user on login until backend token-exchange endpoint is implemented.
+        Alert.alert(
+          "Google Sign-In complete",
+          "Google account verified, but backend login is not connected yet. Please use email/password for now.",
+        );
       } else if (response?.type === "error") {
-        Alert.alert("Google Sign-In failed", response.error?.message ?? "Unknown error.");
+        Alert.alert(
+          "Google Sign-In failed",
+          response.error?.message ?? "Unknown error.",
+        );
       }
     };
 
@@ -53,14 +98,16 @@ export default function Login() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Logo Circle */}
           <Image
-  source={require("../assets/images/finsight.png")}
-  style={styles.logo}
-  resizeMode="contain"
-/>
+            source={require("../assets/images/finsight.png")}
+            style={styles.logo}
+            resizeMode="contain"
+          />
 
           {/* App Name */}
           <Text style={styles.appName}>FinSight</Text>
@@ -94,10 +141,11 @@ export default function Login() {
             onPress={handleLogin}
             disabled={loading}
           >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.confirmText}>Confirm</Text>
-            }
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.confirmText}>Confirm</Text>
+            )}
           </TouchableOpacity>
 
           {/* Divider */}
@@ -106,7 +154,10 @@ export default function Login() {
           <Text style={styles.signInWith}>Sign in With :</Text>
 
           <TouchableOpacity
-            style={[styles.googleButton, (!request || loading) && { opacity: 0.6 }]}
+            style={[
+              styles.googleButton,
+              (!request || loading) && { opacity: 0.6 },
+            ]}
             disabled={!request || loading}
             onPress={() => promptAsync()}
           >
@@ -121,13 +172,11 @@ export default function Login() {
           >
             <Text style={styles.signUpText}>Sign Up</Text>
           </TouchableOpacity>
-
         </ScrollView>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {
@@ -236,8 +285,8 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-  width: 170,
-  height: 170,
-  marginBottom: 10,
-},
+    width: 170,
+    height: 170,
+    marginBottom: 10,
+  },
 });
