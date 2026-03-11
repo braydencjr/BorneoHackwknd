@@ -36,6 +36,7 @@ import {
 import ResilienceChat from '@/components/resilience/resilience-chat';
 import ShockTimelineCard from '@/components/resilience/shock-timeline-card';
 import StressTestCard from '@/components/resilience/stress-test-card';
+import { useOverviewScan, type AnalysisData } from '@/hooks/use-overview-scan';
 import {
   useResilienceStream,
   type AlertData,
@@ -47,7 +48,6 @@ import {
   type StressTestData,
   type VitalsData,
 } from '@/hooks/use-resilience-stream';
-import { useOverviewScan, type AnalysisData } from '@/hooks/use-overview-scan';
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const T = {

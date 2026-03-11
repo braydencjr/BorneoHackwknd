@@ -1,4 +1,4 @@
-package com.borneohackwknd.app
+package com.brayden.borneohackwknd
 
 import android.content.ComponentName
 import android.content.Context

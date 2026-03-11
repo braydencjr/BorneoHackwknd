@@ -1,4 +1,7 @@
 from app.models.user import User
 from app.models.spending import SpendingTransaction, SpendingAnalysis
+from app.models.transactions import Transaction
+from app.models.regional_risk import RegionalRiskCache
+from app.models.contingency_plan import ContingencyPlan
 
-__all__ = ["User", "SpendingTransaction", "SpendingAnalysis"]
+__all__ = ["User", "SpendingTransaction", "SpendingAnalysis", "Transaction", "RegionalRiskCache", "ContingencyPlan"]

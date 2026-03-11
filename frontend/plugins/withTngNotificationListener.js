@@ -87,7 +87,7 @@ function copyKotlinSources(config) {
     "android",
     (cfg) => {
       const projectRoot = cfg.modRequest.projectRoot;
-      const androidPkg = "app/src/main/java/com/borneohackwknd/app";
+      const androidPkg = "app/src/main/java/com/brayden/borneohackwknd";
       const destDir = path.join(projectRoot, "android", androidPkg);
 
       // Source files live next to this plugin file
