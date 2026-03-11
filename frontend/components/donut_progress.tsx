@@ -15,7 +15,6 @@ export default function DonutProgress({
   size = 140,
   strokeWidth = 15,
 }: Props) {
-
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
@@ -24,9 +23,7 @@ export default function DonutProgress({
 
   return (
     <View style={{ width: size, height: size }}>
-
       <Svg width={size} height={size}>
-
         {/* Background */}
         <Circle
           stroke="#E0E0E0"
@@ -62,20 +59,16 @@ export default function DonutProgress({
           rotation={outcome * 3.6 - 90}
           origin={`${size / 2}, ${size / 2}`}
         />
-
       </Svg>
 
       {/* Center text */}
-     <View style={styles.center}>
-  <Text style={styles.text}>
-    {Math.round(income)}% | {Math.round(outcome)}%
-  </Text>
+      <View style={styles.center}>
+        <Text style={styles.text}>
+          {Math.round(income)}% | {Math.round(outcome)}%
+        </Text>
 
-  <Text style={styles.subText}>
-    Income   Outcome
-  </Text>
-</View>
-
+        <Text style={styles.subText}>Income | Expenses</Text>
+      </View>
     </View>
   );
 }
@@ -94,8 +87,8 @@ const styles = StyleSheet.create({
   },
 
   subText: {
-  fontSize: 10,
-  color: "#666",
-  marginTop: 2,
-},
+    fontSize: 10,
+    color: "#666",
+    marginTop: 2,
+  },
 });

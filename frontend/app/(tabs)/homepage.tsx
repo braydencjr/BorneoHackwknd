@@ -5,24 +5,44 @@ import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useState } from "react";
 import {
-    Animated,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import CategoryDonut from "../../components/category_donut";
 import DonutProgress from "../../components/donut_progress";
 
 export default function HomePage() {
   const [user, setUser] = useState<any>(null);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [aiInsights, setAiInsights] = useState<
+    {
+      title: string;
+      body: string;
+      isPositive: boolean;
+    }[]
+  >([]);
 
   useFocusEffect(
     useCallback(() => {
       const fetchUser = async () => {
         try {
+//           const token = await SecureStore.getItemAsync("accessToken");
+//           if (!token) return;
+
+//           const res = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+//             headers: { Authorization: `Bearer ${token}` },
+//           });
+
+//           const data = await res.json();
+          
+          // TODO: Determine which works, currently default to the code from the main branch
+
           const data = await authService.me();
           if (!data) {
             router.replace("/loginpage");
@@ -43,7 +63,6 @@ export default function HomePage() {
   const [selectedTab, setSelectedTab] = useState<"A" | "B" | "C" | "D">("A");
   const [income, setIncome] = useState(0);
   const [outcome, setOutcome] = useState(0);
-  const [percentage, setPercentage] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [incomePercentage, setIncomePercentage] = useState(0);
   const [outcomePercentage, setOutcomePercentage] = useState(0);
@@ -106,21 +125,63 @@ export default function HomePage() {
     }, []),
   );
 
-  const tabData = {
-    A: { percentage: percentage, color: "#7CB518", title: "Income vs Outcome" },
-    B: { percentage: 60, color: "#4C8DAE", title: "Income" },
-    C: { percentage: 46, color: "#F59E0B", title: "Outcome" },
-    D: { percentage: 22, color: "#E4572E", title: "Transactions" },
-  };
+  useFocusEffect(
+    useCallback(() => {
+      const fetchAiInsight = async () => {
+        try {
+          setAiInsightsLoading(true);
+          setAiInsights([]);
+
+          const token = await SecureStore.getItemAsync("accessToken");
+          if (!token) {
+            setAiInsightsLoading(false);
+            return;
+          }
+
+          const res = await fetch(`${BASE_URL}/api/v1/summary/suggestions`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (!res.ok) {
+            setAiInsights([]);
+            return;
+          }
+
+          const data = await res.json();
+          const cards = (data?.cards || [])
+            .filter((card: any) => card?.body)
+            .slice(0, 3)
+            .map((card: any) => ({
+              title: card.title || "AI Spending Insight",
+              body: String(card.body),
+              isPositive: Boolean(card.isPositive),
+            }));
+
+          setAiInsights(cards);
+        } catch (error) {
+          console.error("Failed to fetch AI insight:", error);
+          setAiInsights([]);
+        } finally {
+          setAiInsightsLoading(false);
+        }
+      };
+
+      fetchAiInsight();
+    }, []),
+  );
 
   const tabs = [
     { key: "A", label: "Overview", icon: "grid-outline" },
     { key: "B", label: "Income", icon: "arrow-down-circle-outline" },
-    { key: "C", label: "Outcome", icon: "arrow-up-circle-outline" },
+    { key: "C", label: "Expenses", icon: "arrow-up-circle-outline" },
     { key: "D", label: "Transactions", icon: "receipt-outline" },
   ] as const;
 
-  const tabWidth = containerWidth / tabs.length;
+  const TABS_SIDE_PADDING = 15;
+  const tabWidth =
+    Math.max(containerWidth - TABS_SIDE_PADDING * 2, 0) / tabs.length;
+  const indicatorWidth = tabWidth * 0.5;
+  const indicatorBaseLeft = TABS_SIDE_PADDING + (tabWidth - indicatorWidth) / 2;
 
   function getMerchantCode(name: string) {
     if (!name) return "TXN";
@@ -131,6 +192,55 @@ export default function HomePage() {
       .join("")
       .slice(0, 3)
       .toUpperCase();
+  }
+
+  const FIXED_CATEGORIES = [
+    "Rent",
+    "Utilities",
+    "Subscription",
+    "Insurance",
+    "Loan",
+    "Installment",
+    "Bill",
+    "Mortgage",
+  ];
+  const BNPL_KEYWORDS = [
+    "bnpl",
+    "installment",
+    "spaylater",
+    "atome",
+    "split",
+    "hoolah",
+    "paylater",
+    "grab paylater",
+    "shopee paylater",
+    "akulaku",
+    "kredivo",
+  ];
+
+  function isFixed(category: string): boolean {
+    return FIXED_CATEGORIES.some((c) =>
+      category?.toLowerCase().includes(c.toLowerCase()),
+    );
+  }
+
+  function isBNPL(category: string, merchant: string): boolean {
+    const haystack = `${category ?? ""} ${merchant ?? ""}`.toLowerCase();
+    return BNPL_KEYWORDS.some((k) => haystack.includes(k));
+  }
+
+  function getHealthLabel(rate: number): string {
+    if (rate < 50) return "Excellent";
+    if (rate < 75) return "Good";
+    if (rate < 100) return "Moderate";
+    return "Critical";
+  }
+
+  function getHealthColor(rate: number): string {
+    if (rate < 50) return "#16A34A";
+    if (rate < 75) return "#D97706";
+    if (rate < 100) return "#F97316";
+    return "#DC2626";
   }
 
   const incomeTransactions = transactions.filter((t) => t.type === "income");
@@ -150,10 +260,12 @@ export default function HomePage() {
 
       return acc;
     }, {}),
-  ).map((c: any) => ({
-    ...c,
-    percentage: incomeTotal > 0 ? (c.amount / incomeTotal) * 100 : 0,
-  }));
+  )
+    .map((c: any) => ({
+      ...c,
+      percentage: incomeTotal > 0 ? (c.amount / incomeTotal) * 100 : 0,
+    }))
+    .sort((a: any, b: any) => b.amount - a.amount);
 
   const outcomeTransactions = transactions.filter((t) => t.type === "expense");
 
@@ -175,10 +287,65 @@ export default function HomePage() {
 
       return acc;
     }, {}),
-  ).map((c: any) => ({
-    ...c,
-    percentage: outcomeTotal > 0 ? (c.amount / outcomeTotal) * 100 : 0,
-  }));
+  )
+    .map((c: any) => ({
+      ...c,
+      percentage: outcomeTotal > 0 ? (c.amount / outcomeTotal) * 100 : 0,
+    }))
+    .sort((a: any, b: any) => b.amount - a.amount);
+
+  const rankedTopExpenses = [...outcomeCategories]
+    .sort((a: any, b: any) => b.amount - a.amount)
+    .slice(0, 3);
+
+  const spendRate =
+    income > 0 ? (outcome / income) * 100 : outcome > 0 ? 100 : 0;
+  const healthLabel = getHealthLabel(spendRate);
+  const healthColor = getHealthColor(spendRate);
+  const savings = income - outcome;
+
+  const fixedExpenseTotal = outcomeTransactions
+    .filter((t) => isFixed(t.category))
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  const flexibleExpenseTotal = outcomeTransactions
+    .filter((t) => !isFixed(t.category))
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  const fixedPct =
+    outcomeTotal > 0 ? (fixedExpenseTotal / outcomeTotal) * 100 : 0;
+  const flexiblePct = 100 - fixedPct;
+
+  const bnplTransactions = transactions.filter((t) =>
+    isBNPL(t.category, t.merchant_name || ""),
+  );
+  const bnplTotal = bnplTransactions.reduce(
+    (sum, t) => sum + Math.abs(t.amount),
+    0,
+  );
+  const bnplPct = outcomeTotal > 0 ? (bnplTotal / outcomeTotal) * 100 : 0;
+
+  const monthlySpending: Record<string, number> = transactions
+    .filter((t) => t.type === "expense")
+    .reduce(
+      (acc, t) => {
+        const key = new Date(t.created_at).toLocaleString("default", {
+          month: "short",
+          year: "2-digit",
+        });
+        acc[key] = (acc[key] || 0) + Math.abs(t.amount);
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+  const monthlyEntries = Object.entries(monthlySpending).slice(-4);
+  const maxMonthlySpend = Math.max(...monthlyEntries.map(([, v]) => v), 1);
+
+  const currentMonth = new Date().toLocaleString("default", {
+    month: "long",
+    year: "numeric",
+  });
 
   function renderTabContent() {
     // INCOME TAB
@@ -288,6 +455,7 @@ export default function HomePage() {
     // OVERVIEW TAB (DEFAULT)
     return (
       <>
+        {/* Income vs Expenses */}
         <View style={styles.expenseRow}>
           <View style={{ marginRight: 15 }}>
             <DonutProgress
@@ -295,27 +463,143 @@ export default function HomePage() {
               outcome={outcomePercentage}
             />
           </View>
-
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Income vs Outcome</Text>
-
-            <Text>• Rent</Text>
-            <Text>• Food</Text>
-            <Text>• Transport</Text>
+            <Text style={styles.cardTitle}>Income vs Expenses</Text>
+            <View style={styles.legendRow}>
+              <View style={[styles.dot, { backgroundColor: "#22C55E" }]} />
+              <Text style={styles.legendValue}>
+                Income: RM{income.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
+              <Text style={styles.legendValue}>
+                Expenses: RM{outcome.toFixed(2)}
+              </Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.incomeBox}>
-          <View style={styles.legendRow}>
-            <View style={[styles.dot, { backgroundColor: "#22C55E" }]} />
-            <Text>Income : RM{income.toFixed(2)}</Text>
+        {/* AI Insight Chips (Gemini via backend endpoint) */}
+        {aiInsightsLoading && (
+          <View style={styles.analysisCard}>
+            <Text style={styles.analysisSectionTitle}>
+              AI Spending Analysis
+            </Text>
+            <View style={styles.aiLoadingRow}>
+              <ActivityIndicator size="small" color="#1E3A8A" />
+              <Text style={styles.aiLoadingText}>Generating analysis...</Text>
+            </View>
           </View>
+        )}
 
-          <View style={styles.legendRow}>
-            <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
-            <Text>Outcome : RM{outcome.toFixed(2)}</Text>
+        {!aiInsightsLoading && aiInsights.length > 0 && (
+          <View style={styles.analysisCard}>
+            <Text style={styles.analysisSectionTitle}>
+              AI Spending Analysis
+            </Text>
+            {aiInsights.map((insight, index) => (
+              <View
+                key={`${insight.title}-${index}`}
+                style={styles.insightCard}
+              >
+                <Ionicons
+                  name={
+                    insight.isPositive ? "checkmark-circle" : "close-circle"
+                  }
+                  size={18}
+                  color={insight.isPositive ? "#16A34A" : "#DC2626"}
+                />
+                <Text style={styles.insightText}>
+                  {insight.title}: {insight.body}
+                </Text>
+              </View>
+            ))}
           </View>
-        </View>
+        )}
+
+        {/* Fixed vs Flexible */}
+        {outcomeTotal > 0 && (
+          <View style={styles.analysisCard}>
+            <Text style={styles.analysisSectionTitle}>
+              Fixed vs Flexible Expenses
+            </Text>
+            <View style={styles.splitBar}>
+              <View
+                style={[
+                  styles.splitBarFixed,
+                  { flex: Math.max(fixedPct, 0.1) },
+                ]}
+              />
+              <View
+                style={[
+                  styles.splitBarFlex,
+                  { flex: Math.max(flexiblePct, 0.1) },
+                ]}
+              />
+            </View>
+            <View style={styles.splitLegend}>
+              <View style={styles.legendRow}>
+                <View style={[styles.dot, { backgroundColor: "#1E3A8A" }]} />
+                <Text style={styles.splitLabel}>
+                  Fixed {fixedPct.toFixed(0)}% — RM
+                  {fixedExpenseTotal.toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.legendRow}>
+                <View style={[styles.dot, { backgroundColor: "#93C5FD" }]} />
+                <Text style={styles.splitLabel}>
+                  Flexible {flexiblePct.toFixed(0)}% — RM
+                  {flexibleExpenseTotal.toFixed(2)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* BNPL / High-Risk Alert */}
+        {bnplTransactions.length > 0 && (
+          <View style={styles.riskCard}>
+            <Text style={styles.riskIcon}>⚠️</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.riskTitle}>
+                High-Risk: BNPL / Deferred Payments
+              </Text>
+              <Text style={styles.riskBody}>
+                {bnplTransactions.length} deferred payment
+                {bnplTransactions.length > 1 ? "s" : ""} totalling RM
+                {bnplTotal.toFixed(2)} ({bnplPct.toFixed(0)}% of spend).
+                Excessive BNPL usage can mask overspending and lead to debt
+                accumulation.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Spending Trend */}
+        {monthlyEntries.length > 1 && (
+          <View style={styles.analysisCard}>
+            <Text style={styles.analysisSectionTitle}>
+              Monthly Spending Trend
+            </Text>
+            {monthlyEntries.map(([month, amount]) => (
+              <View key={month} style={styles.trendRow}>
+                <Text style={styles.trendMonth}>{month}</Text>
+                <View style={styles.trendBarTrack}>
+                  <View
+                    style={[
+                      styles.trendBarFill,
+                      {
+                        width: `${Math.round((amount / maxMonthlySpend) * 100)}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.trendAmount}>RM{amount.toFixed(0)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </>
     );
   }
@@ -333,7 +617,9 @@ export default function HomePage() {
           style={styles.profileCircle}
         />
 
-        <Text style={styles.healthText}>Your Financial Health is Moderate</Text>
+        <Text style={[styles.healthText, { color: healthColor }]}>
+          Financial Health: {healthLabel}
+        </Text>
 
         <TouchableOpacity
           style={styles.scanBox}
@@ -347,16 +633,29 @@ export default function HomePage() {
       <View style={styles.card}>
         <View style={styles.cardRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Current Savings</Text>
-            <Text style={styles.amount}>RM 1000.00</Text>
+            <Text style={styles.cardTitle}>Net Savings</Text>
+            <Text
+              style={[
+                styles.amount,
+                { color: savings >= 0 ? "#1E3A8A" : "#DC2626" },
+              ]}
+            >
+              {savings >= 0 ? "+" : "-"}RM {Math.abs(savings).toFixed(2)}
+            </Text>
           </View>
 
           <View style={styles.verticalDivider} />
 
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Tips for Savings</Text>
-            <Text style={styles.tip}>• Reduce dining out</Text>
-            <Text style={styles.tip}>• Track subscriptions</Text>
+            <Text style={styles.cardTitle}>Top Expenses</Text>
+            {rankedTopExpenses.map((c: any, i: number) => (
+              <Text key={i} style={styles.tip}>
+                {i + 1}. {c.category}
+              </Text>
+            ))}
+            {rankedTopExpenses.length === 0 && (
+              <Text style={styles.tip}>No expenses yet</Text>
+            )}
           </View>
         </View>
       </View>
@@ -376,8 +675,8 @@ export default function HomePage() {
               style={[
                 styles.indicator,
                 {
-                  width: tabWidth * 0.5,
-                  left: tabWidth * 0.25,
+                  width: indicatorWidth,
+                  left: indicatorBaseLeft,
                   transform: [{ translateX: indicatorPosition }],
                 },
               ]}
@@ -386,7 +685,7 @@ export default function HomePage() {
             {tabs.map((tab) => (
               <TouchableOpacity
                 key={tab.key}
-                style={styles.tabButton}
+                style={[styles.tabButton, { width: `${100 / tabs.length}%` }]}
                 onPress={() => {
                   setSelectedTab(tab.key);
 
@@ -401,13 +700,13 @@ export default function HomePage() {
                 <Ionicons
                   name={tab.icon as any}
                   size={22}
-                  color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
+                  color={selectedTab === tab.key ? "#FFFFFF" : "#BFDBFE"}
                 />
 
                 <Text
                   style={[
                     styles.tabLabel,
-                    selectedTab === tab.key && { color: "#1E3A8A" },
+                    selectedTab === tab.key && styles.tabLabelActive,
                   ]}
                 >
                   {tab.label}
@@ -416,7 +715,7 @@ export default function HomePage() {
             ))}
           </View>
 
-          <Text style={styles.monthText}>{"< March 2026 >"}</Text>
+          <Text style={styles.monthText}>{currentMonth}</Text>
 
           {renderTabContent()}
         </View>
@@ -471,7 +770,7 @@ const styles = StyleSheet.create({
   cardLarge: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 15,
+    padding: 25,
     marginBottom: 20,
     elevation: 4,
   },
@@ -511,10 +810,9 @@ const styles = StyleSheet.create({
   progressTabs: {
     position: "absolute",
     top: -25, // makes it float into card
-    left: 40,
-    right: 40,
+    left: 0,
+    right: 0,
     flexDirection: "row",
-    justifyContent: "space-between",
     backgroundColor: "#1E3A8A",
     padding: 15,
     borderRadius: 25,
@@ -582,23 +880,28 @@ const styles = StyleSheet.create({
   indicator: {
     position: "absolute",
     bottom: 6, // sit near bottom
-    height: 1, // thin underline
-    backgroundColor: "#FFFFFF",
+    height: 2,
+    backgroundColor: "#FDE68A",
     borderRadius: 2,
   },
 
   tabButton: {
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
     zIndex: 2,
   },
 
   tabLabel: {
     fontSize: 11,
     marginTop: 4,
-    color: "#FFFFFF",
+    color: "#BFDBFE",
     textAlign: "center",
+  },
+
+  tabLabelActive: {
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
 
   activeTabLabel: {
@@ -706,5 +1009,149 @@ const styles = StyleSheet.create({
   categoryAmount: {
     fontSize: 11,
     color: "#666",
+  },
+
+  legendValue: {
+    fontSize: 13,
+    color: "#374151",
+  },
+
+  insightCard: {
+    backgroundColor: "#EEF2FF",
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+
+  insightIcon: {
+    fontSize: 20,
+  },
+
+  insightText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#1E3A8A",
+    fontWeight: "500",
+    lineHeight: 19,
+  },
+
+  analysisCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+  },
+
+  analysisSectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 10,
+    color: "#0F172A",
+  },
+
+  splitBar: {
+    flexDirection: "row",
+    height: 10,
+    borderRadius: 5,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+
+  splitBarFixed: {
+    backgroundColor: "#1E3A8A",
+  },
+
+  splitBarFlex: {
+    backgroundColor: "#93C5FD",
+  },
+
+  splitLegend: {
+    gap: 4,
+  },
+
+  splitLabel: {
+    fontSize: 12,
+    color: "#475569",
+  },
+
+  riskCard: {
+    backgroundColor: "#FFF7ED",
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: "#F97316",
+    gap: 8,
+  },
+
+  riskIcon: {
+    fontSize: 18,
+    marginTop: 1,
+  },
+
+  riskTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#92400E",
+    marginBottom: 3,
+  },
+
+  riskBody: {
+    fontSize: 12,
+    color: "#78350F",
+    lineHeight: 17,
+  },
+
+  trendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    gap: 8,
+  },
+
+  trendMonth: {
+    width: 52,
+    fontSize: 12,
+    color: "#475569",
+  },
+
+  trendBarTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: "#E2E8F0",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+
+  trendBarFill: {
+    height: "100%",
+    backgroundColor: "#1E3A8A",
+    borderRadius: 4,
+  },
+
+  trendAmount: {
+    width: 62,
+    fontSize: 12,
+    color: "#0F172A",
+    textAlign: "right",
+  },
+
+  aiLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+  },
+
+  aiLoadingText: {
+    fontSize: 13,
+    color: "#334155",
   },
 });

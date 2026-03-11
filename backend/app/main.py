@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import create_tables
-from app.routes import health, auth, resilience, transactions, summary, notifications
+from app.routes import health, auth, resilience, transactions, summary, notifications, spending
 
 settings = get_settings()
 
@@ -63,3 +63,5 @@ app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["
 app.include_router(resilience.router, prefix="/api/v1/resilience", tags=["resilience"])
 app.include_router(summary.router, prefix="/api/v1/summary", tags=["summary"])
 
+
+app.include_router(spending.router,  prefix="/api/v1/spending",  tags=["spending"])
