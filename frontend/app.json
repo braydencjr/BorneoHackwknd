@@ -9,11 +9,12 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.brayden.borneohackwknd"
     },
     "android": {
-      "package": "com.borneohackwknd.app",
       "versionCode": 1,
+      "package": "com.brayden.borneohackwknd",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

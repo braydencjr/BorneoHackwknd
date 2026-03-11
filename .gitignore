@@ -75,6 +75,9 @@ backend/*.db
 # Backend local env
 backend/.env
 
+db-setup/
+docs/
+
 # Frontend local env
 frontend/.env
 
