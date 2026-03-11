@@ -1,12 +1,78 @@
+import { useOverviewScan } from "@/hooks/use-overview-scan";
+import { ScoreData } from "@/hooks/use-resilience-stream";
 import { BASE_URL } from "@/services/api";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useState } from "react";
-import { Animated, Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Animated, Dimensions, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import CategoryDonut from "../../components/category_donut";
 import DonutProgress from "../../components/donut_progress";
+
 const SCREEN_WIDTH = Dimensions.get("window").width;
+
+function ResilienceCard({ scoreData }: { scoreData: ScoreData | null }) {
+
+  if (!scoreData) {
+    return (
+      <View style={styles.resilienceCard}>
+        <ActivityIndicator size="small" color="#1E3A8A" />
+      </View>
+    );
+  }
+
+  const tierColor =
+    scoreData.tier === "strong"
+      ? "#16A34A"
+      : scoreData.tier === "moderate"
+      ? "#D97706"
+      : "#DC2626";
+
+  const tierLabel =
+    scoreData.tier === "strong"
+      ? "RESILIENT"
+      : scoreData.tier === "moderate"
+      ? "AT RISK"
+      : "CRITICAL";
+
+  return (
+    <View style={[styles.resilienceCard, { borderColor: tierColor + "40" }]}>
+
+      <View style={styles.resilienceRow}>
+
+        {/* Ring */}
+        <View style={[styles.resilienceRing, { borderColor: tierColor }]}>
+          <Text style={[styles.resilienceScore, { color: tierColor }]}>
+            {Math.round(scoreData.score)}
+          </Text>
+          <Text style={styles.resilienceMax}>/100</Text>
+        </View>
+
+        {/* Right side */}
+        <View style={styles.resilienceRight}>
+  <View
+    style={[
+      styles.resilienceTierBadge,
+      { backgroundColor: tierColor + "18", borderColor: tierColor + "44" }
+    ]}
+  >
+    <Text style={[styles.resilienceTierText, { color: tierColor }]}>
+      {tierLabel}
+    </Text>
+  </View>
+
+  {/* Verdict text */}
+  {scoreData.verdict && (
+    <Text style={styles.resilienceVerdict}>
+      {scoreData.verdict}
+    </Text>
+  )}
+</View>
+
+      </View>
+    </View>
+  );
+}
 
 export default function HomePage() {
 
@@ -51,6 +117,42 @@ export default function HomePage() {
   const [insights, setInsights] = useState<InsightCard[]>([]);
   const [containerWidth, setContainerWidth] = useState(0);
   const indicatorPosition = useState(new Animated.Value(0))[0];
+
+  const overview = useOverviewScan();
+
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [showMonthModal, setShowMonthModal] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [showYearList, setShowYearList] = useState(false);
+  const years = Array.from({ length: 15 }, (_, i) => new Date().getFullYear() - i);
+
+  const months = [
+  "Jan","Feb","Mar",
+  "Apr","May","Jun",
+  "Jul","Aug","Sep",
+  "Oct","Nov","Dec"
+  ];
+
+  const INCOME_CATEGORIES = [
+  "Salary",
+  "Freelance",
+  "Others"
+];
+
+  const OUTCOME_CATEGORIES = [
+  "Shopping",
+  "Food & Dining",
+  "Entertainment",
+  "Groceries",
+  "Utilities",
+  "Transport",
+  "BNPL",
+  "Health",
+  "Others"
+];
+
+
 
   const fetchInsights = async () => {
   try {
@@ -123,6 +225,12 @@ useFocusEffect(
             headers: { Authorization: `Bearer ${token}` }
           });
           const data = await res.json();
+
+          if (!Array.isArray(data)) {
+  console.log("Invalid transactions response:", data);
+  setTransactions([]);
+  return;
+}
           setTransactions(data);
         } catch (error) {
           console.error("Failed to fetch transactions:", error);
@@ -132,6 +240,7 @@ useFocusEffect(
       fetchTransactions();
     }, [])
   );
+
 
   interface InsightCard {
   type: "praise" | "warning" | "consequence" | "tip";
@@ -225,6 +334,20 @@ interface InsightCard {
     percentage: incomeTotal > 0 ? (c.amount / incomeTotal) * 100 : 0
   }));
 
+  const income_categoryMap = new Map(
+  incomeCategories.map(c => [c.category, c])
+);
+
+const displayIncomeCategories = INCOME_CATEGORIES.map(cat => {
+  const data = income_categoryMap.get(cat);
+
+  return {
+    category: cat,
+    amount: data?.amount ?? 0,
+    percentage: data?.percentage ?? 0
+  };
+});
+
   const outcomeTransactions = transactions.filter(
     t => t.type === "expense"
   );
@@ -254,13 +377,27 @@ interface InsightCard {
     percentage: outcomeTotal > 0 ? (c.amount / outcomeTotal) * 100 : 0
   }));
 
+  const outcome_categoryMap = new Map(
+  outcomeCategories.map(c => [c.category, c])
+);
+
+const displayOutcomeCategories = OUTCOME_CATEGORIES.map(cat => {
+  const data = outcome_categoryMap.get(cat);
+
+  return {
+    category: cat,
+    amount: data?.amount ?? 0,
+    percentage: data?.percentage ?? 0
+  };
+});
+
   function renderTabContent() {
 
     // INCOME TAB
     if (selectedTab === "B") {
       return (
         <View style={styles.donutGrid}>
-          {incomeCategories.map((c, index) => (
+          {displayIncomeCategories.map((c, index) => (
             <View key={index} style={styles.donutItem}>
               <CategoryDonut
                 percentage={Math.round(c.percentage)}
@@ -281,20 +418,20 @@ interface InsightCard {
     if (selectedTab === "C") {
       return (
         <View style={styles.donutGrid}>
-          {outcomeCategories.map((c, index) => (
-            <View key={index} style={styles.donutItem}>
-              <CategoryDonut
-                percentage={Math.round(c.percentage)}
-                color="#EF4444"
-              />
+          {displayOutcomeCategories.map((c, index) => (
+  <View key={index} style={styles.donutItem}>
+    <CategoryDonut
+      percentage={Math.round(c.percentage)}
+      color="#EF4444"
+    />
 
-              <Text style={styles.categoryLabel}>{c.category}</Text>
+    <Text style={styles.categoryLabel}>{c.category}</Text>
 
-              <Text style={styles.categoryAmount}>
-                RM{c.amount.toFixed(2)}
-              </Text>
-            </View>
-          ))}
+    <Text style={styles.categoryAmount}>
+      RM{c.amount.toFixed(2)}
+    </Text>
+  </View>
+))}
         </View>
       );
     }
@@ -413,26 +550,17 @@ interface InsightCard {
 
       {/* Top */}
       <View style={styles.topRow}>
-      <Image
-      source={{
-      uri: user?.profile_photo
-      ? `${BASE_URL}/${user.profile_photo}`
-      : "https://cdn-icons-png.flaticon.com/512/847/847969.png",
-  }}
-  style={styles.profileCircle}
-/>
-
-        <Text style={styles.healthText}>
-          Your Financial Health is Moderate
-        </Text>
 
         <TouchableOpacity
-          style={styles.scanBox}
-          onPress={() => router.push("/scanpage")}
-        >
-          <Ionicons name="scan-outline" size={26} color="#1E3A8A" />
-        </TouchableOpacity>
-      </View>
+    style={styles.scanBox}
+    onPress={() => router.push("/scanpage")}
+  >
+    <Ionicons name="scan-outline" size={47} color="#1E3A8A" />
+  </TouchableOpacity>
+
+  <ResilienceCard scoreData={overview.score} />
+
+</View>
 
       {/* Financial Insights */}
 {insights.length > 0 && (
@@ -454,7 +582,7 @@ interface InsightCard {
 )}
 
       {/* Main Card */}
-      <View style={{ marginTop: 40 }}>
+      <View style={{ marginTop: 25 }}>
 
         <View style={styles.cardLarge}>
 
@@ -466,55 +594,152 @@ interface InsightCard {
             }}
           >
 
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.indicator,
-                {
-                  width: tabWidth * 0.5,
-                  left: tabWidth * 0.25,
-                  transform: [{ translateX: indicatorPosition }],
-                },
-              ]}
-            />
+          
 
             {tabs.map((tab) => (
-              <TouchableOpacity
-                key={tab.key}
-                style={styles.tabButton}
-                onPress={() => {
+  <TouchableOpacity
+    key={tab.key}
+    style={[
+      styles.tabButton,
+      selectedTab === tab.key && styles.tabButtonActive  // ← add this
+    ]}
+    onPress={() => {
+      setSelectedTab(tab.key);
+    }}
+  >
+    <Ionicons
+      name={tab.icon as any}
+      size={22}
+      color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
+    />
+    <Text style={[styles.tabLabel, selectedTab === tab.key && { color: "#1E3A8A" }]}>
+      {tab.label}
+    </Text>
+  </TouchableOpacity>
+))}
 
-                  setSelectedTab(tab.key);
-
-                  const index = tabs.findIndex(t => t.key === tab.key);
-
-                  Animated.spring(indicatorPosition, {
-                    toValue: index * tabWidth,
-                    useNativeDriver: true,
-                  }).start();
-                }}
-              >
-                <Ionicons
-                  name={tab.icon as any}
-                  size={22}
-                  color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
-                />
-
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    selectedTab === tab.key && { color: "#1E3A8A" },
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
 
           </View>
 
 
-          <Text style={styles.monthText}>{"< March 2026 >"}</Text>
+        <View
+  style={{
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15
+  }}
+>
+
+{/* LEFT ARROW */}
+<TouchableOpacity
+  onPress={() =>
+    setSelectedMonth((prev) => (prev === 0 ? 11 : prev - 1))
+  }
+>
+  <Ionicons name="chevron-back" size={22} />
+</TouchableOpacity>
+
+{/* MONTH SELECTOR */}
+<TouchableOpacity
+  style={styles.monthSelector}
+  onPress={() => setShowMonthModal(true)}
+>
+  <Text style={styles.monthText}>
+    {months[selectedMonth]} {selectedYear}
+  </Text>
+
+  <Ionicons name="chevron-down" size={18} />
+</TouchableOpacity>
+
+{/* RIGHT ARROW */}
+<TouchableOpacity
+  onPress={() =>
+    setSelectedMonth((prev) => (prev === 11 ? 0 : prev + 1))
+  }
+>
+  <Ionicons name="chevron-forward" size={22} />
+</TouchableOpacity>
+
+</View>
+
+<Modal
+visible={showMonthModal}
+transparent
+animationType="fade"
+>
+<View style={styles.modalOverlay}>
+
+<View style={styles.monthModal}>
+
+<Text style={styles.modalTitle}>Select Month</Text>
+
+<View style={styles.monthGrid}>
+{months.map((m, index) => (
+<TouchableOpacity
+key={index}
+style={[
+styles.monthItem,
+selectedMonth === index && styles.monthItemActive
+]}
+onPress={() => setSelectedMonth(index)}
+>
+
+<Text
+style={[
+styles.monthTextItem,
+selectedMonth === index && { color:"#fff" }
+]}
+>
+{m}
+</Text>
+
+</TouchableOpacity>
+))}
+</View>
+
+<View style={{ marginTop: 15 }}>
+
+<TouchableOpacity
+style={styles.yearSelector}
+onPress={() => setShowYearList(!showYearList)}
+>
+<Text style={styles.yearText}>{selectedYear}</Text>
+<Ionicons name="chevron-down" size={18} />
+</TouchableOpacity>
+
+{showYearList && (
+<View style={styles.yearList}>
+<ScrollView showsVerticalScrollIndicator={false}>
+{years.map((y) => (
+<TouchableOpacity
+key={y}
+style={styles.yearItem}
+onPress={() => {
+setSelectedYear(y);
+setShowYearList(false);
+}}
+>
+<Text style={styles.yearItemText}>{y}</Text>
+</TouchableOpacity>
+))}
+</ScrollView>
+</View>
+)}
+
+</View>
+
+<TouchableOpacity
+style={styles.doneButton}
+onPress={()=>setShowMonthModal(false)}
+>
+<Text style={{color:"#fff"}}>Done</Text>
+</TouchableOpacity>
+
+</View>
+
+</View>
+</Modal>
 
           {renderTabContent()}
         </View>
@@ -532,32 +757,41 @@ const styles = StyleSheet.create({
   },
 
   topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
+flexDirection: "row",
+alignItems: "center",
+justifyContent: "space-between",
+marginBottom: 16,
+},
 
-  profileCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 2,
-    borderColor: "#000",
-  },
+  profileCircle:{
+width:52,
+height:52,
+borderRadius:26,
+borderWidth:1,
+borderColor:"#E5E7EB",
+},
 
   healthText: {
     flex: 1,
     textAlign: "center",
   },
 
-  scanBox: {
-    width: 60,
-    height: 60,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  scanBox:{
+width:75,
+height:75,
+borderRadius:18,
+
+backgroundColor:"#FFFFFF",
+
+alignItems:"center",
+justifyContent:"center",
+
+shadowColor:"#000000",
+shadowOffset:{width:0,height:6},
+shadowOpacity:0.2,
+shadowRadius:5,
+elevation:4
+},
 
   card: {
     backgroundColor: "#FFFFFF",
@@ -568,6 +802,7 @@ const styles = StyleSheet.create({
   },
 
   cardLarge: {
+    paddingTop: 40,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 15,
@@ -576,11 +811,6 @@ const styles = StyleSheet.create({
   },
 
   cardRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  resilienceRow: {
     flexDirection: "row",
     alignItems: "center",
   },
@@ -609,13 +839,15 @@ const styles = StyleSheet.create({
 
   progressTabs: {
     position: "absolute",
+    alignContent: "center",
+    paddingBottom : 6,
     top: -25,   // makes it float into card
     left: 40,
     right: 40,
     flexDirection: "row",
     justifyContent: "space-between",
     backgroundColor: "#1E3A8A",
-    padding: 15,
+    padding: 4,
     borderRadius: 25,
     elevation: 6,
     zIndex: 10,
@@ -632,10 +864,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
 
-  monthText: {
-    textAlign: "center",
-    marginBottom: 15,
-  },
 
   expenseRow: {
     flexDirection: "row",
@@ -661,7 +889,6 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    marginBottom: 2,
     fontSize: 20,
     fontWeight: "bold",
   },
@@ -679,13 +906,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E3A8A",
   },
 
-  indicator: {
-    position: "absolute",
-    bottom: 6,        // sit near bottom
-    height: 1,        // thin underline
-    backgroundColor: "#FFFFFF",
-    borderRadius: 2,
-  },
+indicator: {
+  position: "absolute",
+  bottom: 6,
+  height: 2,
+  backgroundColor: "#FFFFFF",
+  borderRadius: 2,
+},
 
   tabButton: {
     alignItems: "center",
@@ -696,7 +923,7 @@ const styles = StyleSheet.create({
 
   tabLabel: {
     fontSize: 11,
-    marginTop: 4,
+
     color: "#FFFFFF",
     textAlign: "center",
   },
@@ -711,6 +938,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 12,
+    paddingTop:18,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
@@ -810,6 +1038,7 @@ const styles = StyleSheet.create({
 
   sectionSub: { 
   fontSize: 13, color: "#94A3B8", marginBottom: 12 },
+
   insightCard: {
   width: SCREEN_WIDTH * 0.85,
   flexDirection: "row",
@@ -819,16 +1048,39 @@ const styles = StyleSheet.create({
   backgroundColor: "#FFFFFF",
   borderLeftWidth: 4,
 
-  shadowColor: "#000",
+  shadowColor: "#000000",
   shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.07,
+  shadowOpacity: 0.2,
   shadowRadius: 6,
-  elevation: 2,
+  elevation: 4,
 },
-  insightIconBox: { width: 42, height: 42, borderRadius: 21, justifyContent: "center", alignItems: "center" },
-  insightIconText: { fontSize: 20 },
-  insightLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 1, marginBottom: 2 },
-  insightTitle: { fontSize: 14, fontWeight: "700", color: "#0F172A", marginBottom: 3 },
+
+  insightIconBox: { 
+    width: 42, 
+    height: 42, 
+    borderRadius: 21, 
+    justifyContent: "center", 
+    alignItems: "center" 
+  },
+
+  insightIconText: { 
+    fontSize: 20 
+  },
+
+  insightLabel: { 
+    fontSize: 10, 
+    fontWeight: "700", 
+    letterSpacing: 1, 
+    marginBottom: 2 
+  },
+
+  insightTitle: { 
+    fontSize: 14, 
+    fontWeight: "700", 
+    color: "#0F172A", 
+    marginBottom: 3 
+  },
+
   insightBody: {
   fontSize: 13,
   color: "#475569",
@@ -836,5 +1088,205 @@ const styles = StyleSheet.create({
   flexShrink: 1
 },
 
+tabButtonActive: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 20,
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+},
+
+monthDropdown: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 10,
+  paddingVertical: 8,
+  elevation: 4,
+  marginBottom: 15,
+},
+
+monthItemText: {
+  fontSize: 15,
+},
+
+monthSelector:{
+flexDirection:"row",
+alignItems:"center",
+backgroundColor:"#F1F5F9",
+paddingHorizontal:14,
+paddingVertical:6,
+borderRadius:14,
+marginHorizontal:8
+},
+
+monthText:{
+fontSize:16,
+fontWeight:"600",
+marginRight:6
+},
+
+modalOverlay:{
+position:"absolute",
+top:0,
+left:0,
+right:0,
+bottom:0,
+backgroundColor:"rgba(0,0,0,0.3)",
+justifyContent:"center",
+alignItems:"center",
+zIndex:1000
+},
+
+monthModal:{
+width:"85%",
+backgroundColor:"#fff",
+borderRadius:20,
+padding:20
+},
+
+modalTitle:{
+fontSize:18,
+fontWeight:"600",
+marginBottom:15,
+textAlign:"center"
+},
+
+monthGrid:{
+flexDirection:"row",
+flexWrap:"wrap",
+justifyContent:"space-between"
+},
+
+monthItem:{
+width:"30%",
+padding:10,
+borderRadius:10,
+alignItems:"center",
+marginBottom:10
+},
+
+monthItemActive:{
+backgroundColor:"#1E3A8A"
+},
+
+monthTextItem:{
+fontSize:14
+},
+
+yearRow:{
+flexDirection:"row",
+justifyContent:"center",
+alignItems:"center",
+marginTop:10
+},
+
+yearText:{
+fontSize:18,
+marginHorizontal:20
+},
+
+doneButton:{
+backgroundColor:"#1E3A8A",
+padding:12,
+borderRadius:10,
+marginTop:15,
+alignItems:"center"
+},
+
+yearSelector:{
+flexDirection:"row",
+justifyContent:"center",
+alignItems:"center",
+backgroundColor:"#F1F5F9",
+paddingVertical:8,
+borderRadius:12
+},
+
+yearList:{
+marginTop:8,
+maxHeight:150,
+backgroundColor:"#fff",
+borderRadius:12,
+paddingVertical:5,
+elevation:3
+},
+
+yearItem:{
+paddingVertical:8,
+alignItems:"center"
+},
+
+yearItemText:{
+fontSize:16
+},
+
+resilienceCard:{
+  flexDirection:"row",
+  alignItems:"center",
+  backgroundColor:"#FFFFFF",
+  borderRadius:20,
+  paddingHorizontal:14,
+  paddingVertical:10,
+  borderWidth:1,
+  borderColor:"#FECACA",
+  flex:1,
+  marginHorizontal:10,
+  shadowColor:"#000000",
+  shadowOffset:{width:0,height:6},
+  shadowOpacity:0.2,
+  shadowRadius:5,
+  elevation:4
+},
+
+resilienceRow:{
+flexDirection:"row",
+alignItems:"center",
+gap:10
+},
+
+resilienceRing:{
+width:50,
+height:50,
+borderRadius:22,
+borderWidth:3,
+alignItems:"center",
+justifyContent:"center",
+marginRight:10
+},
+
+resilienceScore:{
+fontSize:18,
+fontWeight:"800",
+lineHeight:20
+},
+
+resilienceMax:{
+fontSize:9,
+color:"#94A3B8"
+},
+
+resilienceRight:{
+flex:1
+},
+
+resilienceTierBadge:{
+alignSelf:"flex-start",
+paddingHorizontal:8,
+paddingVertical:2,
+borderRadius:12,
+borderWidth:1
+},
+
+resilienceTierText:{
+fontSize:9,
+fontWeight:"800",
+letterSpacing:1
+},
+
+resilienceVerdict:{
+fontSize:12,
+color:"#475569",
+marginTop:4,
+lineHeight:16,
+flexShrink:1
+},
 
 });
