@@ -21,3 +21,6 @@ alembic>=1.14.0            # Database migrations
 pytest>=8.0.0
 pytest-asyncio>=0.24.0
 httpx>=0.28.0              # async test client
+
+# plsssss dont make this disappear during PR merge
+deepagents>=0.4.10
