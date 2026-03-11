@@ -1,39 +1,42 @@
 import { BASE_URL } from "@/services/api";
+import { authService } from "@/services/authService";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as SecureStore from "expo-secure-store";
 import { useCallback, useState } from "react";
-import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+    Animated,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
 import CategoryDonut from "../../components/category_donut";
 import DonutProgress from "../../components/donut_progress";
 
 export default function HomePage() {
-
   const [user, setUser] = useState<any>(null);
 
   useFocusEffect(
-  useCallback(() => {
-    const fetchUser = async () => {
-      try {
-        const token = await SecureStore.getItemAsync("accessToken");
-        if (!token) return;
+    useCallback(() => {
+      const fetchUser = async () => {
+        try {
+          const data = await authService.me();
+          if (!data) {
+            router.replace("/loginpage");
+            return;
+          }
+          setUser(data);
+        } catch (error) {
+          console.error("Failed to fetch user:", error);
+        }
+      };
 
-        const res = await fetch(`${BASE_URL}/api/v1/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        const data = await res.json();
-
-        setUser(data);
-
-      } catch (error) {
-        console.error("Failed to fetch user:", error);
-      }
-    };
-
-    fetchUser();
-  }, [])
-);
+      fetchUser();
+    }, []),
+  );
 
   const router = useRouter();
 
@@ -56,7 +59,7 @@ export default function HomePage() {
           if (!token) return;
 
           const res = await fetch(`${BASE_URL}/api/v1/summary/`, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           });
           const data = await res.json();
 
@@ -79,7 +82,7 @@ export default function HomePage() {
       };
 
       fetchData();
-    }, [])
+    }, []),
   );
 
   useFocusEffect(
@@ -90,7 +93,7 @@ export default function HomePage() {
           if (!token) return;
 
           const res = await fetch(`${BASE_URL}/api/v1/transactions/`, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: { Authorization: `Bearer ${token}` },
           });
           const data = await res.json();
           setTransactions(data);
@@ -100,7 +103,7 @@ export default function HomePage() {
       };
 
       fetchTransactions();
-    }, [])
+    }, []),
   );
 
   const tabData = {
@@ -123,21 +126,19 @@ export default function HomePage() {
     if (!name) return "TXN";
     const words = name.split(" ");
     if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
-    return words.map(w => w[0]).join("").slice(0, 3).toUpperCase();
+    return words
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 3)
+      .toUpperCase();
   }
 
-  const incomeTransactions = transactions.filter(
-    t => t.type === "income"
-  );
+  const incomeTransactions = transactions.filter((t) => t.type === "income");
 
-  const incomeTotal = incomeTransactions.reduce(
-    (sum, t) => sum + t.amount,
-    0
-  );
+  const incomeTotal = incomeTransactions.reduce((sum, t) => sum + t.amount, 0);
 
   const incomeCategories = Object.values(
     incomeTransactions.reduce((acc: any, t) => {
-
       if (!acc[t.category]) {
         acc[t.category] = {
           category: t.category,
@@ -148,25 +149,21 @@ export default function HomePage() {
       acc[t.category].amount += t.amount;
 
       return acc;
-
-    }, {})
+    }, {}),
   ).map((c: any) => ({
     ...c,
-    percentage: incomeTotal > 0 ? (c.amount / incomeTotal) * 100 : 0
+    percentage: incomeTotal > 0 ? (c.amount / incomeTotal) * 100 : 0,
   }));
 
-  const outcomeTransactions = transactions.filter(
-    t => t.type === "expense"
-  );
+  const outcomeTransactions = transactions.filter((t) => t.type === "expense");
 
   const outcomeTotal = outcomeTransactions.reduce(
     (sum, t) => sum + Math.abs(t.amount),
-    0
+    0,
   );
 
   const outcomeCategories = Object.values(
     outcomeTransactions.reduce((acc: any, t) => {
-
       if (!acc[t.category]) {
         acc[t.category] = {
           category: t.category,
@@ -177,15 +174,13 @@ export default function HomePage() {
       acc[t.category].amount += Math.abs(t.amount);
 
       return acc;
-
-    }, {})
+    }, {}),
   ).map((c: any) => ({
     ...c,
-    percentage: outcomeTotal > 0 ? (c.amount / outcomeTotal) * 100 : 0
+    percentage: outcomeTotal > 0 ? (c.amount / outcomeTotal) * 100 : 0,
   }));
 
   function renderTabContent() {
-
     // INCOME TAB
     if (selectedTab === "B") {
       return (
@@ -198,9 +193,7 @@ export default function HomePage() {
               />
               <Text style={styles.categoryLabel}>{c.category}</Text>
 
-              <Text style={styles.categoryAmount}>
-                RM{c.amount.toFixed(2)}
-              </Text>
+              <Text style={styles.categoryAmount}>RM{c.amount.toFixed(2)}</Text>
             </View>
           ))}
         </View>
@@ -220,9 +213,7 @@ export default function HomePage() {
 
               <Text style={styles.categoryLabel}>{c.category}</Text>
 
-              <Text style={styles.categoryAmount}>
-                RM{c.amount.toFixed(2)}
-              </Text>
+              <Text style={styles.categoryAmount}>RM{c.amount.toFixed(2)}</Text>
             </View>
           ))}
         </View>
@@ -234,18 +225,15 @@ export default function HomePage() {
       return (
         <View>
           {transactions.map((t) => {
-
             const isIncome = t.type == "income";
 
             return (
               <View key={t.id} style={styles.transactionRow}>
-
                 <View style={styles.transactionLeft}>
-
                   <View
                     style={[
                       styles.transactionIcon,
-                      { backgroundColor: isIncome ? "#E6F9F0" : "#FFECEC" }
+                      { backgroundColor: isIncome ? "#E6F9F0" : "#FFECEC" },
                     ]}
                   >
                     <Ionicons
@@ -266,15 +254,13 @@ export default function HomePage() {
                       {new Date(t.created_at).toDateString()}
                     </Text>
                   </View>
-
                 </View>
 
                 <View style={styles.transactionRight}>
-
                   <Text
                     style={[
                       styles.transactionAmount,
-                      { color: isIncome ? "#16A34A" : "#DC2626" }
+                      { color: isIncome ? "#16A34A" : "#DC2626" },
                     ]}
                   >
                     {isIncome ? "+" : "-"} RM{Math.abs(t.amount).toFixed(2)}
@@ -285,15 +271,13 @@ export default function HomePage() {
                     onPress={() =>
                       router.push({
                         pathname: "/receipt",
-                        params: { image: t.receipt_image }
+                        params: { image: t.receipt_image },
                       })
                     }
                   >
                     <Text style={styles.receiptText}>View</Text>
                   </TouchableOpacity>
-
                 </View>
-
               </View>
             );
           })}
@@ -322,7 +306,6 @@ export default function HomePage() {
         </View>
 
         <View style={styles.incomeBox}>
-
           <View style={styles.legendRow}>
             <View style={[styles.dot, { backgroundColor: "#22C55E" }]} />
             <Text>Income : RM{income.toFixed(2)}</Text>
@@ -332,7 +315,6 @@ export default function HomePage() {
             <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
             <Text>Outcome : RM{outcome.toFixed(2)}</Text>
           </View>
-
         </View>
       </>
     );
@@ -340,21 +322,18 @@ export default function HomePage() {
 
   return (
     <ScrollView style={styles.container}>
-
       {/* Top */}
       <View style={styles.topRow}>
-      <Image
-      source={{
-      uri: user?.profile_photo
-      ? `${BASE_URL}/${user.profile_photo}`
-      : "https://cdn-icons-png.flaticon.com/512/847/847969.png",
-  }}
-  style={styles.profileCircle}
-/>
+        <Image
+          source={{
+            uri: user?.profile_photo
+              ? `${BASE_URL}/${user.profile_photo}`
+              : "https://cdn-icons-png.flaticon.com/512/847/847969.png",
+          }}
+          style={styles.profileCircle}
+        />
 
-        <Text style={styles.healthText}>
-          Your Financial Health is Moderate
-        </Text>
+        <Text style={styles.healthText}>Your Financial Health is Moderate</Text>
 
         <TouchableOpacity
           style={styles.scanBox}
@@ -364,11 +343,9 @@ export default function HomePage() {
         </TouchableOpacity>
       </View>
 
-
       {/* Savings Card */}
       <View style={styles.card}>
         <View style={styles.cardRow}>
-
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Current Savings</Text>
             <Text style={styles.amount}>RM 1000.00</Text>
@@ -381,16 +358,12 @@ export default function HomePage() {
             <Text style={styles.tip}>• Reduce dining out</Text>
             <Text style={styles.tip}>• Track subscriptions</Text>
           </View>
-
         </View>
       </View>
 
-
       {/* Main Card */}
       <View style={{ marginTop: 40 }}>
-
         <View style={styles.cardLarge}>
-
           {/* Tabs */}
           <View
             style={styles.progressTabs}
@@ -398,7 +371,6 @@ export default function HomePage() {
               setContainerWidth(e.nativeEvent.layout.width);
             }}
           >
-
             <Animated.View
               pointerEvents="none"
               style={[
@@ -416,10 +388,9 @@ export default function HomePage() {
                 key={tab.key}
                 style={styles.tabButton}
                 onPress={() => {
-
                   setSelectedTab(tab.key);
 
-                  const index = tabs.findIndex(t => t.key === tab.key);
+                  const index = tabs.findIndex((t) => t.key === tab.key);
 
                   Animated.spring(indicatorPosition, {
                     toValue: index * tabWidth,
@@ -443,16 +414,13 @@ export default function HomePage() {
                 </Text>
               </TouchableOpacity>
             ))}
-
           </View>
-
 
           <Text style={styles.monthText}>{"< March 2026 >"}</Text>
 
           {renderTabContent()}
         </View>
       </View>
-
     </ScrollView>
   );
 }
@@ -542,7 +510,7 @@ const styles = StyleSheet.create({
 
   progressTabs: {
     position: "absolute",
-    top: -25,   // makes it float into card
+    top: -25, // makes it float into card
     left: 40,
     right: 40,
     flexDirection: "row",
@@ -613,8 +581,8 @@ const styles = StyleSheet.create({
 
   indicator: {
     position: "absolute",
-    bottom: 6,        // sit near bottom
-    height: 1,        // thin underline
+    bottom: 6, // sit near bottom
+    height: 1, // thin underline
     backgroundColor: "#FFFFFF",
     borderRadius: 2,
   },
@@ -739,5 +707,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#666",
   },
-
 });

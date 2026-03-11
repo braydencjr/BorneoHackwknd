@@ -3,6 +3,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import text
 
 from app.core.config import get_settings
 
@@ -56,6 +57,15 @@ async def create_tables() -> None:
     """Create all tables on startup (dev convenience). Use Alembic in production."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        # Dev SQLite compatibility patch:
+        # If an existing users table was created before profile_photo was added,
+        # queries selecting the ORM model will fail with "no such column".
+        if settings.DATABASE_URL.startswith("sqlite"):
+            result = await conn.execute(text("PRAGMA table_info(users)"))
+            existing_columns = {row[1] for row in result.fetchall()}
+            if "profile_photo" not in existing_columns:
+                await conn.execute(text("ALTER TABLE users ADD COLUMN profile_photo VARCHAR(500)"))
 
 
 async def get_db() -> AsyncSession:
