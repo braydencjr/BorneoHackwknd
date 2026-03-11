@@ -1,5 +1,5 @@
 from functools import lru_cache
-
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 from typing import List
 
@@ -19,6 +19,7 @@ class Settings(BaseSettings):
         "http://localhost:19006",
         "http://localhost:8081",
         "http://10.0.2.2:8000",       # Android emulator -> host
+        "http://192.168.100.54:8000"
     ]
 
     # Database — override via .env
@@ -39,12 +40,17 @@ class Settings(BaseSettings):
     EMAIL_ADDRESS: str | None = None
     EMAIL_PASSWORD: str | None = None
 
-    GEMINI_API_KEY: str | None = None
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     TAVILY_API_KEY: str | None = None
+    CLAUDE_API_KEY: str | None = None
+    CLAUDE_MODEL: str = "claude-sonnet-4-6"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"  
+    )
 
 
 @lru_cache

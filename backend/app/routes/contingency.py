@@ -15,7 +15,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -212,6 +212,7 @@ async def get_shock_simulation(
     shock_type: str,
     duration_months: int = Query(3, ge=1, le=6, description="Simulation duration in months"),
     severity: str = Query("moderate", description="moderate | severe"),
+    refresh: bool = Query(False, description="Force-evict the regional risk cache and re-fetch from Tavily"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -233,6 +234,13 @@ async def get_shock_simulation(
     # Pin to a plain int immediately — db.rollback() inside fetch_or_refresh_risks
     # expires all ORM objects on this session, making lazy attribute access crash.
     user_id: int = int(current_user.id)
+
+    # ── Optional cache eviction (refresh=True) ────────────────────────────────
+    if refresh:
+        await db.execute(
+            delete(RegionalRiskCache).where(RegionalRiskCache.query_type == shock_type)
+        )
+        await db.commit()
 
     # ── 1. Vulnerability profile ──────────────────────────────────────────
     profile = await build_vulnerability_profile(db, current_user, days=92)

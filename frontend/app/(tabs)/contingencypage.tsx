@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import api from "../../services/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ const TAB_CONTEXT: Record<string, string> = {
 };
 
 export default function ContingencyPage() {
-
+  const { width: screenWidth } = Dimensions.get("window");
   const [containerWidth, setContainerWidth] = useState(0);
   const [savingInput, setSavingInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -97,10 +97,10 @@ export default function ContingencyPage() {
   const [shockError, setShockError] = useState<string | null>(null);
 
   const tabs = [
-    { key: "A", label: "Illness",        icon: "medkit-outline"      },
-    { key: "B", label: "Job Loss",       icon: "briefcase-outline"   },
-    { key: "C", label: "Nature Disaster",icon: "thunderstorm-outline"},
-    { key: "D", label: "War",            icon: "shield-outline"      },
+    { key: "A", label: "Illness", icon: "medkit-outline" },
+    { key: "B", label: "Job Loss", icon: "briefcase-outline" },
+    { key: "C", label: "Nature Disaster", icon: "thunderstorm-outline" },
+    { key: "D", label: "War", icon: "shield-outline" },
   ] as const;
 
   const tabWidth = containerWidth / tabs.length;
@@ -286,12 +286,25 @@ export default function ContingencyPage() {
           <View style={{ marginTop: 12 }}>
             <Text style={styles.riskHeader}>📡 Regional signals</Text>
             {shock.regional_risks.map((r, i) => (
-              <View key={i} style={styles.riskRow}>
+              <TouchableOpacity
+                key={i}
+                style={styles.riskRow}
+                onPress={() => r.source_url ? Linking.openURL(r.source_url) : undefined}
+                activeOpacity={r.source_url ? 0.65 : 1}
+              >
                 <View style={[styles.riskDot, {
                   backgroundColor: r.severity >= 4 ? "#EF4444" : r.severity >= 2 ? "#F59E0B" : "#6B7280",
                 }]} />
-                <Text style={styles.riskLabel} numberOfLines={2}>{r.event_title}</Text>
-              </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.riskLabel} numberOfLines={2}>{r.event_title}</Text>
+                  {r.source_url ? (
+                    <Text style={styles.riskUrl} numberOfLines={1}>{r.source_url}</Text>
+                  ) : null}
+                </View>
+                {r.source_url ? (
+                  <Ionicons name="open-outline" size={14} color="#6B7280" style={{ marginTop: 2 }} />
+                ) : null}
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -482,7 +495,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -573,10 +585,10 @@ const styles = StyleSheet.create({
   },
 
   cardWrapper: {
-  marginTop: 40,
-  alignItems: "center",
-  position: "relative",
-},
+    marginTop: 40,
+    alignItems: "center",
+    position: "relative",
+  },
 
 mainCard: {
   width: "100%",
@@ -587,45 +599,47 @@ mainCard: {
   overflow: "hidden",
 },
 
-progressTabs: {
-  position: "absolute",
-  top: -35,
-  flexDirection: "row",
-  justifyContent: "space-around",
-  alignItems: "center",
-  width: "85%",
-  backgroundColor: "#1E3A8A",
-  borderRadius: 30,
-  paddingVertical: 18,
-  elevation: 10,
-  overflow: "hidden",
-},
+  progressTabs: {
+    position: "absolute",
+    top: -35,
+    flexDirection: "row",
+    alignItems: "center",
+    left: 0,
+    right: 0,
+    backgroundColor: "#1E3A8A",
+    borderRadius: 30,
+    paddingHorizontal: 15,
+    paddingVertical: 18,
+    elevation: 10,
+    overflow: "hidden",
+  },
 
-tabBox: {
-  width: 50,
-  height: 50,
-  backgroundColor: "#C4C4C4",
-  borderRadius: 12,
-},
+  tabBox: {
+    width: 50,
+    height: 50,
+    backgroundColor: "#C4C4C4",
+    borderRadius: 12,
+  },
 
-tabButton: {
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: 8,
-  zIndex: 2,
-},
+  tabButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    zIndex: 2,
+  },
 
-tabLabel: {
-  fontSize: 11,
-  marginTop: 4,
-  color: "#FFFFFF",
-  textAlign: "center",
-},
+  tabLabel: {
+    fontSize: 11,
+    marginTop: 4,
+    color: "#BFDBFE",
+    textAlign: "center",
+  },
 
-activeTabLabel: {
-  color: "#1E3A8A",
-  fontWeight: "600",
-},
+  tabLabelActive: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
 
 indicator: {
   position: "absolute",
@@ -704,6 +718,12 @@ riskDetail: {
   color: "#6B7280",
   marginTop: 2,
 },
+riskUrl: {
+  fontSize: 10,
+  color: "#3B82F6",
+  marginTop: 2,
+  textDecorationLine: "underline",
+},
 allClearRow: {
   flexDirection: "row",
   alignItems: "center",
@@ -726,8 +746,8 @@ riskBadgeText: {
   color: "#374151",
 },
 
-title: {
-    marginTop : 24,
+  title: {
+    marginTop: 24,
     fontSize: 24,
     fontWeight: "700",
     marginBottom: 6,

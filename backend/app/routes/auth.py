@@ -9,7 +9,7 @@ from app.services.otp_service import generate_otp, verify_otp
 from pydantic import BaseModel
 
 from app.core.database import get_db
-from app.core.security import decode_token, create_access_token, create_refresh_token
+from app.core.security import decode_token, create_access_token, create_refresh_token, verify_password, hash_password
 from app.schemas.user import UserCreate, UserOut, TokenResponse, RefreshRequest
 from app.services.auth_service import auth_service
 from app.dependencies import get_current_user
@@ -29,6 +29,19 @@ class OTPVerifyRequest(BaseModel):
 
 class OTPRequest(BaseModel):
     email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 router = APIRouter()
 
@@ -150,3 +163,59 @@ async def update_user(
         "profile_photo": current_user.profile_photo
     }
 
+@router.post("/change-password")
+async def change_password(
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+
+    # verify current password
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=400,
+            detail="Current password is incorrect"
+        )
+
+    # update password
+    current_user.hashed_password = hash_password(data.new_password)
+
+    await db.commit()
+
+    return {"message": "Password changed successfully"}
+
+@router.post("/forgot-password")
+async def forgot_password(data: ForgotPasswordRequest):
+
+    email = data.email
+
+    # reuse your OTP generator
+    otp = generate_otp(email)
+
+    try:
+        send_email(email, otp)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return {"message": "Password reset OTP sent"}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    data: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+
+    if not verify_otp(data.email, data.otp):
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+
+    user = await auth_service.get_user_by_email(db, data.email)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password = auth_service.hash_password(data.new_password)
+
+    await db.commit()
+
+    return {"message": "Password updated successfully"}
