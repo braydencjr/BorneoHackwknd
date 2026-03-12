@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import api from "../../services/api";
+import { ActivityIndicator, Alert, Dimensions, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import api from "../services/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Indicator {
@@ -85,7 +85,7 @@ export default function ContingencyPage() {
   const [containerWidth, setContainerWidth] = useState(0);
   const [savingInput, setSavingInput] = useState("");
   const [saving, setSaving] = useState(false);
-  const indicatorPosition = useState(new Animated.Value(0))[0];
+
   const [selectedTab, setSelectedTab] = useState<"A" | "B" | "C" | "D">("A");
 
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -359,45 +359,33 @@ export default function ContingencyPage() {
           style={styles.progressTabs}
           onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
         >
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              styles.indicator,
-              {
-                width: tabWidth * 0.5,
-                left: tabWidth * 0.25,
-                transform: [{ translateX: indicatorPosition }],
-              },
-            ]}
-          />
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.key}
-              style={styles.tabButton}
-              onPress={() => {
-                setSelectedTab(tab.key);
-                const index = tabs.findIndex((t) => t.key === tab.key);
-                Animated.spring(indicatorPosition, {
-                  toValue: index * tabWidth,
-                  useNativeDriver: true,
-                }).start();
-              }}
-            >
-              <Ionicons
-                name={tab.icon as any}
-                size={22}
-                color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
-              />
-              <Text
-                style={[
-                  styles.tabLabel,
-                  selectedTab === tab.key && { color: "#1E3A8A" },
-                ]}
-              >
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          
+        {tabs.map((tab) => (
+  <TouchableOpacity
+    key={tab.key}
+    style={[
+      styles.tabButton,
+      selectedTab === tab.key && styles.tabButtonActive
+    ]}
+    onPress={() => {
+      setSelectedTab(tab.key);
+    }}
+  >
+    <Ionicons
+      name={tab.icon as any}
+      size={22}
+      color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
+    />
+    <Text
+      style={[
+        styles.tabLabel,
+        selectedTab === tab.key && { color: "#1E3A8A" }
+      ]}
+    >
+      {tab.label}
+    </Text>
+  </TouchableOpacity>
+))}
         </View>
       </View>
 
@@ -601,17 +589,18 @@ mainCard: {
 
   progressTabs: {
     position: "absolute",
-    top: -35,
+    alignContent: "center",
+    paddingBottom : 6,
+    top: -25,   // makes it float into card
+    left: 40,
+    right: 40,
     flexDirection: "row",
-    alignItems: "center",
-    left: 0,
-    right: 0,
+    justifyContent: "space-between",
     backgroundColor: "#1E3A8A",
-    borderRadius: 30,
-    paddingHorizontal: 15,
-    paddingVertical: 18,
-    elevation: 10,
-    overflow: "hidden",
+    padding: 4,
+    borderRadius: 25,
+    elevation: 6,
+    zIndex: 10,
   },
 
   tabBox: {
@@ -621,13 +610,6 @@ mainCard: {
     borderRadius: 12,
   },
 
-  tabButton: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    zIndex: 2,
-  },
 
   tabLabel: {
     fontSize: 11,
@@ -644,7 +626,6 @@ mainCard: {
 indicator: {
   position: "absolute",
   bottom: 6,
-  height: 1,
   backgroundColor: "#FFFFFF",
   borderRadius: 2,
 },
@@ -792,6 +773,7 @@ riskBadgeText: {
 
   // ── Shock simulation card styles ─────────────────────────────────────────
   severityRow: {
+    marginTop:15,
     marginBottom: 10,
   },
   severityBadge: {
@@ -900,5 +882,18 @@ riskBadgeText: {
     color: "#065F46",
     lineHeight: 17,
   },
+
+  tabButton: {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  paddingHorizontal: 10,
+  paddingVertical: 6,   // ← same padding for all tabs
+  borderRadius: 20,
+},
+
+tabButtonActive: {
+  backgroundColor: "#FFFFFF",
+},
 
 });
