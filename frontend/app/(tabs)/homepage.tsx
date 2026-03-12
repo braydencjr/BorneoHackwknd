@@ -35,6 +35,10 @@ function ResilienceCard({
   isLoading?: boolean;
   onRetry?: () => void;
 }) {
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
   if (!scoreData) {
     return (
       <TouchableOpacity
@@ -45,12 +49,20 @@ function ResilienceCard({
         {isLoading ? (
           <>
             <ActivityIndicator size="small" color="#1E3A8A" />
+<<<<<<< Updated upstream
             <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 4 }}>Scanning…</Text>
+=======
+            <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 6, textAlign: "center" }}>Scanning your finances…</Text>
+>>>>>>> Stashed changes
           </>
         ) : (
           <>
             <Ionicons name="pulse-outline" size={22} color="#1E3A8A" />
+<<<<<<< Updated upstream
             <Text style={{ fontSize: 11, color: "#1E3A8A", marginTop: 4, fontWeight: "600" }}>Tap to scan</Text>
+=======
+            <Text style={{ fontSize: 11, color: "#1E3A8A", marginTop: 6, fontWeight: "600", textAlign: "center" }}>Tap to run health scan</Text>
+>>>>>>> Stashed changes
           </>
         )}
       </TouchableOpacity>
@@ -914,11 +926,15 @@ const fixedExpenseTotal = outcomeTransactions
     <Ionicons name="scan-outline" size={47} color="#1E3A8A" />
   </TouchableOpacity>
 
+<<<<<<< Updated upstream
   <ResilienceCard
     scoreData={overview.score}
     isLoading={overview.isLoading}
     onRetry={overview.refresh}
   />
+=======
+  <ResilienceCard scoreData={overview.score} isLoading={overview.isLoading} onRetry={overview.refresh} />
+>>>>>>> Stashed changes
 
 </View>
 

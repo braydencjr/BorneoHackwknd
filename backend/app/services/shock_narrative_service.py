@@ -104,7 +104,19 @@ _STATIC_FALLBACKS: dict[str, dict] = {
 }
 
 
+<<<<<<< Updated upstream
 # ── Deterministic computation (no AI dependency) ─────────────────────────────
+=======
+def _build_prompt(simulation: dict, profile: dict, shock_type: str, regional_risks: list | None = None) -> str:
+    projections  = simulation["monthly_projected"]
+    trends       = simulation.get("spending_trends", {})
+    top_cat      = simulation["top_category_affected"]
+    total_impact = simulation["grand_total_impact"]
+    one_time     = simulation["one_time_cost_estimate"]
+    months_broke = simulation.get("months_until_broke")
+    indicators   = profile.get("indicators", [])
+    regional_risks = regional_risks or []
+>>>>>>> Stashed changes
 
 def _compute_deterministic_fields(simulation: dict, profile: dict) -> dict:
     """
@@ -267,6 +279,7 @@ async def generate_shock_analysis(
         }
 
 
+<<<<<<< Updated upstream
 async def _fetch_with_grounding(shock_type: str, surplus_save: float) -> tuple[list, str]:
     """
     Calls Gemini 2.5 Flash with Google Search grounding to fetch current
@@ -275,6 +288,12 @@ async def _fetch_with_grounding(shock_type: str, surplus_save: float) -> tuple[l
     """
     from google import genai as gai
     from google.genai import types as gtypes
+=======
+REGIONAL RISK EVENTS (real recent events in Malaysia — reference where relevant):
+{chr(10).join(f'  - {r["event_title"]} (severity {r["severity"]}/5)' for r in regional_risks[:3]) if regional_risks else '  - No specific regional events on record'}
+
+{_MY_CONTEXT}
+>>>>>>> Stashed changes
 
     search_hint    = _SEARCH_HINTS.get(shock_type, "")
     scenario_label = _SCENARIO_LABELS.get(shock_type, shock_type)
@@ -347,13 +366,81 @@ async def generate_shock_narrative(
     simulation: dict,
     profile: dict,
     shock_type: str,
+    regional_risks: list | None = None,
 ) -> dict:
     """
     Legacy wrapper — converts structured analysis to the old {narrative, action_today} shape.
     Kept so any other callers don't break during transition.
     """
+<<<<<<< Updated upstream
     result = await generate_shock_analysis(simulation, profile, shock_type)
     return {
         "narrative":    result.get("withstand_summary", ""),
         "action_today": result.get("action_today", ""),
     }
+=======
+    raw_surplus = profile.get("surplus", 100)
+    fallback_amount = round(min(max(raw_surplus * 0.5, 50), 1000) / 10) * 10
+    fallback_action = (
+        f"Set aside RM{fallback_amount:.0f} into a dedicated emergency savings account today."
+    )
+
+    if not settings.GEMINI_API_KEY:
+        return {
+            "narrative": (
+                f"A {shock_type.replace('_', ' ')} scenario would create significant "
+                "financial pressure based on your current spending profile."
+            ),
+            "action_today": fallback_action,
+        }
+
+    prompt = _build_prompt(simulation, profile, shock_type, regional_risks or [])
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    model = genai.GenerativeModel("models/gemini-2.5-flash-lite")
+    loop = asyncio.get_running_loop()
+
+    try:
+        response = await loop.run_in_executor(None, lambda: model.generate_content(prompt))
+        full_text = response.text.strip()
+        logger.debug("Gemini raw response for %s: %.400s", shock_type, full_text)
+
+        # Strip markdown code fences Gemini 2.5 Flash often adds
+        cleaned = full_text.replace("```json", "").replace("```", "").strip()
+
+        narrative = cleaned
+        action_today = fallback_action
+
+        # Robust extraction: regex finds {"action_today": "<any text>"}
+        # This is immune to `}` inside the value or trailing Gemini text.
+        m = re.search(r'\{\s*"action_today"\s*:\s*"([^"]+)"\s*\}', cleaned)
+        if m:
+            action_today = m.group(1)
+            # narrative = everything before the JSON block
+            json_start = cleaned.rfind('{', 0, m.start() + 1)
+            narrative = cleaned[:json_start].strip() if json_start >= 0 else cleaned
+        elif '{"action_today"' in cleaned:
+            # Fallback: try the old splitting approach
+            parts = cleaned.rsplit('{"action_today"', 1)
+            narrative = parts[0].strip()
+            raw_json = '{"action_today"' + parts[1]
+            brace_end = raw_json.find("}") + 1
+            if brace_end > 0:
+                try:
+                    parsed = json.loads(raw_json[:brace_end])
+                    action_today = parsed.get("action_today", fallback_action)
+                except Exception as parse_exc:
+                    logger.warning("JSON parse fallback failed for %s: %s | raw_json=%.200s", shock_type, parse_exc, raw_json)
+
+        return {"narrative": narrative, "action_today": action_today}
+
+    except Exception as exc:
+        logger.exception("Gemini narrative generation failed for shock_type=%s: %s", shock_type, exc)
+        return {
+            "narrative": (
+                f"A {shock_type.replace('_', ' ')} event would create a projected "
+                f"RM{simulation['grand_total_impact']:.0f} impact on your finances "
+                f"over {simulation['duration_months']} months."
+            ),
+            "action_today": fallback_action,
+        }
+>>>>>>> Stashed changes

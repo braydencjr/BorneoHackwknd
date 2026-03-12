@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import api from "../services/api";
 
+const { width: SCREEN_W } = Dimensions.get("window");
+// container paddingHorizontal:20 each side (40) + cardInner padding:16 each side (32) = 72
+const INCIDENT_CARD_W = SCREEN_W - 72;
+
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Indicator {
   name: string;
@@ -86,6 +90,161 @@ const TAB_RELEVANT: Record<string, string[]> = {
   D: ["near_zero_surplus", "high_fixed_costs", "irregular_income"],
 };
 
+<<<<<<< Updated upstream
+=======
+const TAB_SCENARIO_TITLE = {
+  A: "Financial Simulation with Recent Illness",
+  B: "Financial Simulation with Job Market Risk",
+  C: "Financial Simulation with Natural Disaster",
+  D: "Financial Simulation with Geopolitical Conflict",
+};
+
+type PreparationRange = {
+  label: string
+  min: number
+  max: number
+}
+
+type PreparationItem = {
+  label: string
+  value: string
+  isTotal?: boolean
+}
+
+function getPreparationItems(shock:any): PreparationItem[] {
+
+const monthly = shock.baseline_monthly_expense;
+const duration = shock.duration_months;
+const oneTime = shock.one_time_cost_estimate || 0;
+
+let rows: PreparationRange[] = [];
+
+switch(shock.shock_type){
+
+case "illness":
+
+rows = [
+{
+label:"Hospital treatment",
+min: oneTime * 0.8,
+max: oneTime * 1.5
+},
+{
+label:"Medication & recovery",
+min: monthly * 0.3,
+max: monthly * 0.9
+},
+{
+label:"Income disruption",
+min: monthly * duration,
+max: monthly * duration * 2
+}
+];
+
+break;
+
+
+case "job_loss":
+
+rows = [
+{
+label:"Living expenses",
+min: monthly * duration,
+max: monthly * duration * 1.5
+},
+{
+label:"Job search costs",
+min: monthly * 0.05,
+max: monthly * 0.15
+},
+{
+label:"Skill upgrade",
+min: monthly * 0.3,
+max: monthly * 0.8
+}
+];
+
+break;
+
+
+case "disaster":
+
+rows = [
+{
+label:"Home repair",
+min: oneTime * 0.8,
+max: oneTime * 1.6
+},
+{
+label:"Temporary relocation",
+min: monthly * 0.5,
+max: monthly
+},
+{
+label:"Emergency supplies",
+min: monthly * 0.1,
+max: monthly * 0.3
+}
+];
+
+break;
+
+
+case "war":
+
+rows = [
+{
+label:"Food supply buffer",
+min: monthly * 0.5,
+max: monthly
+},
+{
+label:"Fuel & transport",
+min: monthly * 0.3,
+max: monthly * 0.6
+},
+{
+label:"Inflation buffer",
+min: monthly * duration,
+max: monthly * duration * 1.8
+}
+];
+
+break;
+}
+
+
+// ── Calculate total range ──
+
+const totalMin = rows.reduce((sum,r)=>sum+r.min,0);
+const totalMax = rows.reduce((sum,r)=>sum+r.max,0);
+
+
+// ── Format rows ──
+
+const round100Down = (n: number) => Math.floor(n / 100) * 100;
+const round100Up   = (n: number) => Math.ceil(n  / 100) * 100;
+const fmtRange = (min: number, max: number) =>
+  `RM ${round100Down(min).toLocaleString()} – RM ${round100Up(max).toLocaleString()}`;
+
+const formatted: PreparationItem[] = rows.map(r=>({
+label:r.label,
+value: fmtRange(r.min, r.max)
+}));
+
+
+// ── Add TOTAL row ──
+
+formatted.push({
+  label:"Total estimated",
+  value: fmtRange(totalMin, totalMax),
+  isTotal:true
+})
+
+return formatted;
+}
+
+>>>>>>> Stashed changes
 const INDICATOR_LABEL: Record<string, string> = {
   health_exposure_high: "High health spending",
   single_income_source: "Single income source",
@@ -431,12 +590,16 @@ export default function ContingencyPage() {
     return (
       <View style={styles.cardInner}>
 
+<<<<<<< Updated upstream
         {/* Scenario context */}
         <View style={styles.contextBox}>
           <Text style={styles.contextBoxText}>{TAB_CONTEXT[selectedTab]}</Text>
         </View>
 
         {/* Severity badge */}
+=======
+        {/* 1 ── Severity badge */}
+>>>>>>> Stashed changes
         <View style={styles.severityRow}>
           <View style={[styles.severityBadge, {
             backgroundColor: shock.severity_label === "critical" ? "#FEE2E2" : shock.severity_label === "severe" ? "#FEE2E2" : "#FEF3C7",
@@ -449,7 +612,7 @@ export default function ContingencyPage() {
           </View>
         </View>
 
-        {/* Fund coverage bar */}
+        {/* 2 ── Fund coverage bar */}
         <Text style={styles.coverageLabel}>Fund coverage for this scenario</Text>
         <View style={styles.coverageBar}>
           <View style={[styles.coverageFill, { width: `${coveragePct}%` as any, backgroundColor: coverageColor }]} />
@@ -461,17 +624,45 @@ export default function ContingencyPage() {
             : "  ·  fund fully covers this shock"}
         </Text>
 
-        {/* Shortfall chip */}
-        {shock.grand_total_impact > 0 && (
-          <View style={styles.shortfallChip}>
-            <Ionicons name="warning-outline" size={14} color="#DC2626" />
-            <Text style={styles.shortfallChipText}>
-              RM{fmt(shock.grand_total_impact)} total impact over {shock.duration_months} months
-              {shock.one_time_cost_estimate > 0 ? `  (incl. RM${fmt(shock.one_time_cost_estimate)} one-off)` : ""}
-            </Text>
+        {/* 3 ── Incident cards (regional_risks) — moved above table */}
+        {(shock.regional_risks ?? []).length > 0 && (
+          <View style={styles.simulationSection}>
+            <Text style={styles.simulationTitle}>{TAB_SCENARIO_TITLE[selectedTab]}</Text>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+            >
+              {(shock.regional_risks ?? []).slice(0, 5).map((risk, i) => (
+                <View key={i} style={styles.simulationCard}>
+                  <View style={styles.simTopRow}>
+                    <View style={styles.simLeft}>
+                      <Text style={styles.simDisease}>{risk.event_title}</Text>
+                      <Text style={styles.simLocation}>ASEAN Region</Text>
+                      {risk.source_url && (
+                        <Text
+                          style={styles.simSource}
+                          onPress={() => Linking.openURL(risk.source_url)}
+                        >
+                          {new URL(risk.source_url).hostname.replace("www.", "")}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.simDivider} />
+                    <View style={styles.simRight}>
+                      <Text style={styles.simSurvive}>Survive</Text>
+                      <Text style={styles.simMonths}>
+                        {shock.months_until_broke ?? shock.duration_months} Months
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         )}
 
+<<<<<<< Updated upstream
         {/* Monthly projection */}
         <Text style={styles.tableSectionLabel}>📅  3-MONTH PROJECTION</Text>
         <View style={styles.tableHeader}>
@@ -506,6 +697,67 @@ export default function ContingencyPage() {
         />
 
         {/* Action callout */}
+=======
+        {/* 5 ── What you need to prepare */}
+        <View style={styles.prepareCard}>
+          <Text style={styles.prepareTitle}>💰 WHAT YOU NEED TO PREPARE</Text>
+          {prepItems.map((item, index) => (
+            <View
+              key={index}
+              style={[
+                styles.prepareRow,
+                item.isTotal && { borderTopWidth: 1, borderTopColor: "#D1D5DB", borderBottomWidth: 0, marginTop: 6, paddingTop: 12 },
+              ]}
+            >
+              <Text style={[styles.prepareLabel, item.isTotal && { fontWeight: "700", color: "#111827" }]}>
+                {item.label}
+              </Text>
+              <Text style={[styles.prepareValue, item.isTotal && { color: "#DC2626", fontSize: 15 }]}>
+                {item.value}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* 6 ── Monthly projection — one card per month, no squishing */}
+        <View style={styles.analysisCard}>
+          <Text style={styles.analysisCardTitle}>Monthly Projection</Text>
+          {(shock.monthly_projected ?? []).map((m) => {
+            const analysis =
+              m.month === 1 ? "Initial financial shock"
+              : m.month === 2 ? "Savings buffer shrinking"
+              : m.month === shock.duration_months ? "Pressure peaks here"
+              : "Ongoing financial strain";
+            const isShortfall = m.deficit < 0;
+            return (
+              <View key={m.month} style={styles.monthCard}>
+                <View style={styles.monthCardHeader}>
+                  <Text style={styles.monthCardMonth}>Month {m.month}</Text>
+                  <Text style={styles.monthCardAnalysis}>{analysis}</Text>
+                </View>
+                <View style={styles.monthMoneyRow}>
+                  <View style={styles.monthMoneyCol}>
+                    <Text style={styles.monthMoneyLabel}>Income</Text>
+                    <Text style={styles.monthMoneyValue}>RM{fmt(m.income)}</Text>
+                  </View>
+                  <View style={[styles.monthMoneyCol, styles.monthMoneyColMid]}>
+                    <Text style={styles.monthMoneyLabel}>Expenses</Text>
+                    <Text style={styles.monthMoneyValue}>RM{fmt(m.expense)}</Text>
+                  </View>
+                  <View style={styles.monthMoneyCol}>
+                    <Text style={styles.monthMoneyLabel}>Net</Text>
+                    <Text style={[styles.monthMoneyValue, { color: isShortfall ? "#EF4444" : "#10B981" }]}>
+                      {isShortfall ? "−" : "+"}RM{fmt(Math.abs(m.deficit))}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* 7 ── Do this today */}
+>>>>>>> Stashed changes
         {shock.action_today ? (
           <View style={styles.actionBox}>
             <Text style={styles.actionTitle}>✅ Do this today</Text>
@@ -1039,6 +1291,7 @@ riskBadgeText: {
     fontSize: 12,
     marginBottom: 18,
   },
+<<<<<<< Updated upstream
   shortfallChip: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -1056,6 +1309,9 @@ riskBadgeText: {
     flex: 1,
     lineHeight: 19,
   },
+=======
+
+>>>>>>> Stashed changes
   tableHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1124,7 +1380,7 @@ riskBadgeText: {
     backgroundColor: "#ECFDF5",
     borderRadius: 10,
     padding: 12,
-    marginTop: 10,
+    marginTop: 2,
     borderLeftWidth: 3,
     borderLeftColor: "#10B981",
   },
@@ -1153,4 +1409,300 @@ tabButtonActive: {
   backgroundColor: "#FFFFFF",
 },
 
+<<<<<<< Updated upstream
+=======
+simulationRow:{
+flexDirection:"row",
+alignItems:"center",
+paddingVertical:12
+},
+
+simulationDivider:{
+  height:1,
+  backgroundColor:"#E5E7EB",
+  marginVertical:10
+},
+
+simulationSurviveText:{
+fontSize:12,
+color:"#6B7280"
+},
+
+simulationSurviveMonth:{
+fontSize:16,
+fontWeight:"700",
+color:"#111827"
+},
+
+tableMonth:{
+flex:0.6,
+fontSize:11,
+textAlign:"center"
+},
+
+tableMoney:{
+flex:1,
+fontSize:11,
+textAlign:"center"
+},
+
+tableAnalysis:{
+flex:2,
+fontSize:11,
+color:"#6B7280"
+},
+
+  analysisCard:{
+    backgroundColor:"#FFFFFF",
+    borderRadius:16,
+    padding:16,
+    marginTop:12,
+    marginBottom:18,
+    shadowColor:"#000",
+    shadowOpacity:0.05,
+    shadowRadius:8,
+    elevation:3
+  },
+
+  analysisCardTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 12,
+    letterSpacing: 0.3,
+  },
+
+  monthCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+
+  monthCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  monthCardMonth: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E3A8A",
+  },
+
+  monthCardAnalysis: {
+    fontSize: 11,
+    color: "#6B7280",
+    flexShrink: 1,
+    textAlign: "right",
+    marginLeft: 8,
+  },
+
+  monthMoneyRow: {
+    flexDirection: "row",
+  },
+
+  monthMoneyCol: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+
+  monthMoneyColMid: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 8,
+    marginHorizontal: 4,
+  },
+
+  monthMoneyLabel: {
+    fontSize: 10,
+    color: "#9CA3AF",
+    marginBottom: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  monthMoneyValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111827",
+  },
+
+simulationEvent:{
+  fontSize:16,
+  fontWeight:"600",
+  lineHeight:22,
+  marginBottom:6
+},
+
+simulationUrl:{
+  fontSize:12,
+  color:"#3B82F6",
+  marginBottom:10
+},
+
+simulationSurvive:{
+  alignItems:"center"
+},
+
+simviveLabel:{
+  fontSize:13,
+  color:"#6B7280"
+},
+
+simulationMonths:{
+  fontSize:22,
+  fontWeight:"700",
+  color:"#1E3A8A"
+},
+
+/* ───────── Simulation Section ───────── */
+
+simulationSection:{
+  marginTop:26
+},
+
+simulationTitle:{
+  fontSize:18,
+  fontWeight:"700",
+  marginBottom:16,
+  color:"#111827"
+},
+
+/* ───────── Swipe Card ───────── */
+
+simulationCard:{
+  width: INCIDENT_CARD_W,
+  backgroundColor:"#ebf0f7",
+  borderRadius:20,
+  padding:20,
+
+  shadowColor:"#000",
+  shadowOpacity:0.05,
+  shadowRadius:12,
+  elevation:4
+},
+
+/* ───────── Top Row Layout ───────── */
+
+simTopRow:{
+  flexDirection:"row",
+  alignItems:"center",
+  marginBottom:16
+},
+
+simLeft:{
+  flex:1
+},
+
+simRight:{
+  width:110,
+  alignItems:"center"
+},
+
+simDivider:{
+  width:1,
+  height:60,
+  backgroundColor:"#E5E7EB",
+  marginHorizontal:16
+},
+
+/* ───────── Left Column Text ───────── */
+
+simDisease:{
+  fontSize:18,
+  fontWeight:"600",
+  color:"#111827",
+  marginBottom:4
+},
+
+simLocation:{
+  fontSize:14,
+  color:"#6B7280"
+},
+
+simSource:{
+  fontSize:12,
+  color:"#2563EB",
+  marginTop:4
+},
+
+/* ───────── Right Column (Survival) ───────── */
+
+simSurvive:{
+  fontSize:13,
+  color:"#6B7280"
+},
+
+simMonths:{
+  fontSize:24,
+  fontWeight:"700",
+  color:"#1E3A8A",
+  marginTop:2
+},
+
+/* ───────── Preparation Table ───────── */
+
+prepareCard:{
+  marginTop:10,
+  backgroundColor:"#F9FAFB",
+  borderRadius:14,
+  padding:14
+},
+
+prepareTitle:{
+  fontSize:12,
+  fontWeight:"700",
+  color:"#6B7280",
+  marginBottom:10,
+  letterSpacing:0.5
+},
+
+prepareRow:{
+    flexDirection:"row",
+    justifyContent:"space-between",
+    alignItems:"flex-start",
+    paddingVertical:10,
+    borderBottomWidth:1,
+    borderBottomColor:"#E5E7EB"
+  },
+
+  prepareLabel:{
+    fontSize:13,
+    color:"#374151",
+    flex:1,
+    paddingRight: 8,
+  },
+
+  prepareValue:{
+    fontSize:13,
+    fontWeight:"600",
+    color:"#111827",
+    textAlign:"right",
+    flexShrink:1,
+    maxWidth:"58%",
+  },
+
+prepareTotal:{
+  flexDirection:"row",
+  justifyContent:"space-between",
+  marginTop:12
+},
+
+prepareTotalLabel:{
+  fontSize:15,
+  fontWeight:"700",
+  color:"#111827"
+},
+
+prepareTotalValue:{
+  fontSize:15,
+  fontWeight:"700",
+  color:"#DC2626"
+},
+
+>>>>>>> Stashed changes
 });
