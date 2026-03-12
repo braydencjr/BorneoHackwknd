@@ -26,13 +26,35 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
     return "#DC2626";
   }
 
-function ResilienceCard({ scoreData }: { scoreData: ScoreData | null }) {
+function ResilienceCard({
+  scoreData,
+  isLoading,
+  onRetry,
+}: {
+  scoreData: ScoreData | null;
+  isLoading?: boolean;
+  onRetry?: () => void;
+}) {
 
   if (!scoreData) {
     return (
-      <View style={styles.resilienceCard}>
-        <ActivityIndicator size="small" color="#1E3A8A" />
-      </View>
+      <TouchableOpacity
+        style={styles.resilienceCard}
+        onPress={!isLoading ? onRetry : undefined}
+        activeOpacity={isLoading ? 1 : 0.7}
+      >
+        {isLoading ? (
+          <>
+            <ActivityIndicator size="small" color="#1E3A8A" />
+            <Text style={{ fontSize: 11, color: "#6B7280", marginTop: 6, textAlign: "center" }}>Scanning your finances…</Text>
+          </>
+        ) : (
+          <>
+            <Ionicons name="pulse-outline" size={22} color="#1E3A8A" />
+            <Text style={{ fontSize: 11, color: "#1E3A8A", marginTop: 6, fontWeight: "600", textAlign: "center" }}>Tap to run health scan</Text>
+          </>
+        )}
+      </TouchableOpacity>
     );
   }
 
@@ -893,7 +915,7 @@ const fixedExpenseTotal = outcomeTransactions
     <Ionicons name="scan-outline" size={47} color="#1E3A8A" />
   </TouchableOpacity>
 
-  <ResilienceCard scoreData={overview.score} />
+  <ResilienceCard scoreData={overview.score} isLoading={overview.isLoading} onRetry={overview.refresh} />
 
 </View>
 

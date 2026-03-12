@@ -3,6 +3,10 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import api from "../services/api";
 
+const { width: SCREEN_W } = Dimensions.get("window");
+// container paddingHorizontal:20 each side (40) + cardInner padding:16 each side (32) = 72
+const INCIDENT_CARD_W = SCREEN_W - 72;
+
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Indicator {
   name: string;
@@ -194,9 +198,14 @@ const totalMax = rows.reduce((sum,r)=>sum+r.max,0);
 
 // ── Format rows ──
 
+const round100Down = (n: number) => Math.floor(n / 100) * 100;
+const round100Up   = (n: number) => Math.ceil(n  / 100) * 100;
+const fmtRange = (min: number, max: number) =>
+  `RM ${round100Down(min).toLocaleString()} – RM ${round100Up(max).toLocaleString()}`;
+
 const formatted: PreparationItem[] = rows.map(r=>({
 label:r.label,
-value:`RM ${r.min.toLocaleString()} – RM ${r.max.toLocaleString()}`
+value: fmtRange(r.min, r.max)
 }));
 
 
@@ -204,7 +213,7 @@ value:`RM ${r.min.toLocaleString()} – RM ${r.max.toLocaleString()}`
 
 formatted.push({
   label:"Total estimated",
-  value:`RM ${totalMin.toLocaleString()} – RM ${totalMax.toLocaleString()}`,
+  value: fmtRange(totalMin, totalMax),
   isTotal:true
 })
 
@@ -347,7 +356,6 @@ export default function ContingencyPage() {
     }
 
     // ── Full shock simulation card ──────────────────────────────────────────
-    // months_until_broke: how long the fund lasts; cap at duration for display
     const fundMonths = Math.min(shock.months_until_broke ?? shock.duration_months, shock.duration_months);
     const coveragePct = Math.min((fundMonths / shock.duration_months) * 100, 100);
     const coverageColor = coveragePct >= 80 ? "#10B981" : coveragePct >= 40 ? "#F59E0B" : "#EF4444";
@@ -355,7 +363,7 @@ export default function ContingencyPage() {
     return (
       <View style={styles.cardInner}>
 
-        {/* Severity badge */}
+        {/* 1 ── Severity badge */}
         <View style={styles.severityRow}>
           <View style={[styles.severityBadge, {
             backgroundColor: shock.severity_label === "critical" ? "#FEE2E2" : shock.severity_label === "severe" ? "#FEE2E2" : "#FEF3C7",
@@ -368,7 +376,7 @@ export default function ContingencyPage() {
           </View>
         </View>
 
-        {/* Fund coverage bar */}
+        {/* 2 ── Fund coverage bar */}
         <Text style={styles.coverageLabel}>Fund coverage for this scenario</Text>
         <View style={styles.coverageBar}>
           <View style={[styles.coverageFill, {
@@ -383,148 +391,103 @@ export default function ContingencyPage() {
             : "  ·  fund fully covers this shock"}
         </Text>
 
-        {/* Shortfall chip */}
-        {shock.grand_total_impact > 0 && (
-          <View style={styles.shortfallChip}>
-            <Ionicons name="warning-outline" size={14} color="#DC2626" />
-            <Text style={styles.shortfallChipText}>
-              RM{fmt(shock.grand_total_impact)} total impact over {shock.duration_months} months
-              {shock.one_time_cost_estimate > 0 ? `  (incl. RM${fmt(shock.one_time_cost_estimate)} one-off)` : ""}
-            </Text>
+        {/* 3 ── Incident cards (regional_risks) — moved above table */}
+        {(shock.regional_risks ?? []).length > 0 && (
+          <View style={styles.simulationSection}>
+            <Text style={styles.simulationTitle}>{TAB_SCENARIO_TITLE[selectedTab]}</Text>
+            <ScrollView
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+            >
+              {(shock.regional_risks ?? []).slice(0, 5).map((risk, i) => (
+                <View key={i} style={styles.simulationCard}>
+                  <View style={styles.simTopRow}>
+                    <View style={styles.simLeft}>
+                      <Text style={styles.simDisease}>{risk.event_title}</Text>
+                      <Text style={styles.simLocation}>ASEAN Region</Text>
+                      {risk.source_url && (
+                        <Text
+                          style={styles.simSource}
+                          onPress={() => Linking.openURL(risk.source_url)}
+                        >
+                          {new URL(risk.source_url).hostname.replace("www.", "")}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.simDivider} />
+                    <View style={styles.simRight}>
+                      <Text style={styles.simSurvive}>Survive</Text>
+                      <Text style={styles.simMonths}>
+                        {shock.months_until_broke ?? shock.duration_months} Months
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         )}
 
-        {/* Monthly mini-table */}
-        <View style={styles.analysisCard}>
-        <View style={styles.tableHeader}>
-        <Text style={styles.tableMonth}>Month</Text>
-        <Text style={styles.tableMoney}>Income</Text>
-        <Text style={styles.tableMoney}>Expenses</Text>
-        <Text style={styles.tableMoney}>Net</Text>
-        <Text style={styles.tableAnalysis}>Analysis</Text>
+        {/* 5 ── What you need to prepare */}
+        <View style={styles.prepareCard}>
+          <Text style={styles.prepareTitle}>💰 WHAT YOU NEED TO PREPARE</Text>
+          {prepItems.map((item, index) => (
+            <View
+              key={index}
+              style={[
+                styles.prepareRow,
+                item.isTotal && { borderTopWidth: 1, borderTopColor: "#D1D5DB", borderBottomWidth: 0, marginTop: 6, paddingTop: 12 },
+              ]}
+            >
+              <Text style={[styles.prepareLabel, item.isTotal && { fontWeight: "700", color: "#111827" }]}>
+                {item.label}
+              </Text>
+              <Text style={[styles.prepareValue, item.isTotal && { color: "#DC2626", fontSize: 15 }]}>
+                {item.value}
+              </Text>
+            </View>
+          ))}
         </View>
-        {(shock.monthly_projected ?? []).map((m) => {
 
-  const analysis =
-    m.month === 1
-      ? "Initial financial shock"
-      : m.month === 2
-      ? "Savings buffer shrinking"
-      : m.month === shock.duration_months
-      ? "Pressure peaks here"
-      : "Ongoing financial strain";
+        {/* 6 ── Monthly projection — one card per month, no squishing */}
+        <View style={styles.analysisCard}>
+          <Text style={styles.analysisCardTitle}>Monthly Projection</Text>
+          {(shock.monthly_projected ?? []).map((m) => {
+            const analysis =
+              m.month === 1 ? "Initial financial shock"
+              : m.month === 2 ? "Savings buffer shrinking"
+              : m.month === shock.duration_months ? "Pressure peaks here"
+              : "Ongoing financial strain";
+            const isShortfall = m.deficit < 0;
+            return (
+              <View key={m.month} style={styles.monthCard}>
+                <View style={styles.monthCardHeader}>
+                  <Text style={styles.monthCardMonth}>Month {m.month}</Text>
+                  <Text style={styles.monthCardAnalysis}>{analysis}</Text>
+                </View>
+                <View style={styles.monthMoneyRow}>
+                  <View style={styles.monthMoneyCol}>
+                    <Text style={styles.monthMoneyLabel}>Income</Text>
+                    <Text style={styles.monthMoneyValue}>RM{fmt(m.income)}</Text>
+                  </View>
+                  <View style={[styles.monthMoneyCol, styles.monthMoneyColMid]}>
+                    <Text style={styles.monthMoneyLabel}>Expenses</Text>
+                    <Text style={styles.monthMoneyValue}>RM{fmt(m.expense)}</Text>
+                  </View>
+                  <View style={styles.monthMoneyCol}>
+                    <Text style={styles.monthMoneyLabel}>Net</Text>
+                    <Text style={[styles.monthMoneyValue, { color: isShortfall ? "#EF4444" : "#10B981" }]}>
+                      {isShortfall ? "−" : "+"}RM{fmt(Math.abs(m.deficit))}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
 
-  return (
-    <View key={m.month} style={styles.tableRow}>
-      <Text style={styles.tableMonth}>{m.month}</Text>
-
-      <Text style={styles.tableMoney}>
-        RM{fmt(m.income)}
-      </Text>
-
-      <Text style={styles.tableMoney}>
-        RM{fmt(m.expense)}
-      </Text>
-
-      <Text
-        style={[
-          styles.tableMoney,
-          { color: m.deficit < 0 ? "#EF4444" : "#10B981", fontWeight: "600" }
-        ]}
-      >
-        {m.deficit < 0 ? "-" : "+"}RM{fmt(Math.abs(m.deficit))}
-      </Text>
-
-      <Text style={styles.tableAnalysis}>{analysis}</Text>
-    </View>
-  );
-})}
-</View>
-
-{/* Scenario Signals */}
-<View style={styles.simulationSection}>
-
-<Text style={styles.simulationTitle}>
-{TAB_SCENARIO_TITLE[selectedTab]}
-</Text>
-
-<ScrollView
-horizontal
-pagingEnabled
-showsHorizontalScrollIndicator={false}
-contentContainerStyle={{ paddingRight: 20 }}
->
-
-{(shock.regional_risks ?? [])
-.slice(0,5)
-.map((risk,i)=>(
-<View key={i} style={styles.simulationCard}>
-
-{/* TOP SECTION */}
-<View style={styles.simTopRow}>
-
-<View style={styles.simLeft}>
-<Text style={styles.simDisease}>{risk.event_title}</Text>
-
-<Text style={styles.simLocation}>
-Malaysia
-</Text>
-
-{risk.source_url && (
-<Text
-style={styles.simSource}
-onPress={()=>Linking.openURL(risk.source_url)}
->
-{new URL(risk.source_url).hostname.replace("www.","")}
-</Text>
-)}
-
-</View>
-
-<View style={styles.simDivider}/>
-
-<View style={styles.simRight}>
-<Text style={styles.simSurvive}>Survive</Text>
-
-<Text style={styles.simMonths}>
-{shock.months_until_broke ?? shock.duration_months} Months
-</Text>
-</View>
-
-</View>
-
-</View>
-))}
-
-</ScrollView>
-
-{/* PREPARATION TABLE */}
-<View style={styles.prepareCard}>
-
-<Text style={styles.prepareTitle}>
-💰 WHAT YOU NEED TO PREPARE
-</Text>
-
-{prepItems.map((item,index)=>(
-<View key={index} style={styles.prepareRow}>
-
-<Text style={styles.prepareLabel}>
-{item.label}
-</Text>
-
-<Text style={styles.prepareValue}>
-{item.value}
-</Text>
-
-</View>
-))}
-
-</View>
-
-</View>
-
-
-        {/* Action callout */}
+        {/* 7 ── Do this today */}
         {shock.action_today ? (
           <View style={styles.actionBox}>
             <Text style={styles.actionTitle}>✅ Do this today</Text>
@@ -1030,22 +993,7 @@ riskBadgeText: {
     fontSize: 11,
     marginBottom: 10,
   },
-  shortfallChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#FEE2E2",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 12,
-  },
-  shortfallChipText: {
-    fontSize: 12,
-    color: "#DC2626",
-    fontWeight: "600",
-    flex: 1,
-  },
+
   tableHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1091,7 +1039,7 @@ riskBadgeText: {
     backgroundColor: "#ECFDF5",
     borderRadius: 10,
     padding: 12,
-    marginTop: 10,
+    marginTop: 2,
     borderLeftWidth: 3,
     borderLeftColor: "#10B981",
   },
@@ -1161,17 +1109,84 @@ fontSize:11,
 color:"#6B7280"
 },
 
-analysisCard:{
-  backgroundColor:"#FFFFFF",
-  borderRadius:16,
-  padding:16,
-  marginTop:12,
-  marginBottom:18,
-  shadowColor:"#000",
-  shadowOpacity:0.05,
-  shadowRadius:8,
-  elevation:3
-},
+  analysisCard:{
+    backgroundColor:"#FFFFFF",
+    borderRadius:16,
+    padding:16,
+    marginTop:12,
+    marginBottom:18,
+    shadowColor:"#000",
+    shadowOpacity:0.05,
+    shadowRadius:8,
+    elevation:3
+  },
+
+  analysisCardTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#374151",
+    marginBottom: 12,
+    letterSpacing: 0.3,
+  },
+
+  monthCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+
+  monthCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  monthCardMonth: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E3A8A",
+  },
+
+  monthCardAnalysis: {
+    fontSize: 11,
+    color: "#6B7280",
+    flexShrink: 1,
+    textAlign: "right",
+    marginLeft: 8,
+  },
+
+  monthMoneyRow: {
+    flexDirection: "row",
+  },
+
+  monthMoneyCol: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+
+  monthMoneyColMid: {
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: "#E5E7EB",
+    paddingHorizontal: 8,
+    marginHorizontal: 4,
+  },
+
+  monthMoneyLabel: {
+    fontSize: 10,
+    color: "#9CA3AF",
+    marginBottom: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  monthMoneyValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111827",
+  },
 
 simulationEvent:{
   fontSize:16,
@@ -1217,11 +1232,10 @@ simulationTitle:{
 /* ───────── Swipe Card ───────── */
 
 simulationCard:{
-  width:330,
+  width: INCIDENT_CARD_W,
   backgroundColor:"#ebf0f7",
   borderRadius:20,
   padding:20,
-  marginRight:18,
 
   shadowColor:"#000",
   shadowOpacity:0.05,
@@ -1290,6 +1304,7 @@ simMonths:{
 /* ───────── Preparation Table ───────── */
 
 prepareCard:{
+  marginTop:10,
   backgroundColor:"#F9FAFB",
   borderRadius:14,
   padding:14
@@ -1304,24 +1319,29 @@ prepareTitle:{
 },
 
 prepareRow:{
-  flexDirection:"row",
-  justifyContent:"space-between",
-  paddingVertical:10,
-  borderBottomWidth:1,
-  borderBottomColor:"#E5E7EB"
-},
+    flexDirection:"row",
+    justifyContent:"space-between",
+    alignItems:"flex-start",
+    paddingVertical:10,
+    borderBottomWidth:1,
+    borderBottomColor:"#E5E7EB"
+  },
 
-prepareLabel:{
-  fontSize:14,
-  color:"#374151",
-  flex:1
-},
+  prepareLabel:{
+    fontSize:13,
+    color:"#374151",
+    flex:1,
+    paddingRight: 8,
+  },
 
-prepareValue:{
-  fontSize:14,
-  fontWeight:"600",
-  color:"#111827"
-},
+  prepareValue:{
+    fontSize:13,
+    fontWeight:"600",
+    color:"#111827",
+    textAlign:"right",
+    flexShrink:1,
+    maxWidth:"58%",
+  },
 
 prepareTotal:{
   flexDirection:"row",
