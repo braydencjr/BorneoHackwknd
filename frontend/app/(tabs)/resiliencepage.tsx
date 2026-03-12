@@ -20,17 +20,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Animated,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 
 import ResilienceChat from '@/components/resilience/resilience-chat';
@@ -38,15 +38,15 @@ import ShockTimelineCard from '@/components/resilience/shock-timeline-card';
 import StressTestCard from '@/components/resilience/stress-test-card';
 import { useOverviewScan, type AnalysisData } from '@/hooks/use-overview-scan';
 import {
-  useResilienceStream,
-  type AlertData,
-  type ChatMessage,
-  type ChipsData,
-  type PlanData,
-  type ScoreData,
-  type ShockData,
-  type StressTestData,
-  type VitalsData,
+    useResilienceStream,
+    type AlertData,
+    type ChatMessage,
+    type ChipsData,
+    type PlanData,
+    type ScoreData,
+    type ShockData,
+    type StressTestData,
+    type VitalsData,
 } from '@/hooks/use-resilience-stream';
 import ContingencyPage from "../contingencypage";
 
