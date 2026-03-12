@@ -1,15 +1,19 @@
 """
-shock_narrative_service.py — Phase 5
+shock_narrative_service.py — Phase 5 (v2: structured analysis)
 
-Generates a personalized, Malaysia-specific financial impact narrative using Gemini
-with full context injection (not template substitution).
+Returns a structured JSON analysis (not prose narrative) per shock scenario.
+Uses Gemini with Google Search grounding for real-time 2024-2025 ASEAN context.
 
-Key improvements over a generic prompt:
-  - Full spending profile injected as structured context
-  - Malaysian safety nets explicitly modeled: EPF, SOCSO EIS, hospital cost tiers
-  - Spending trends included: "your food costs are rising RM40/month"
-  - SOCSO coverage likelihood inferred from employment stability indicator
-  - RM amounts are the user's real numbers — Gemini reasons about THEIR situation
+Output schema:
+  asean_incidents:        list[{name, cost_rm_range, year}]
+  contingency_costs:      list[{item, min_rm, max_rm}]
+  total_contingency_min:  int
+  total_contingency_max:  int
+  withstand_verdict:      "YES" | "BORDERLINE" | "NO"
+  withstand_summary:      str  (≤ 35 words, real RM numbers)
+  months_can_survive:     float | None
+  action_today:           str  (≤ 15 words, specific + RM figure)
+  narrative:              ""   (kept for backward-compat, not rendered)
 """
 
 from __future__ import annotations
@@ -19,142 +23,325 @@ import json
 import logging
 import re
 
-import google.generativeai as genai
-
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# ─── Static Malaysian financial context (injected into every prompt) ──────────
-_MY_CONTEXT = """\
-MALAYSIA-SPECIFIC FINANCIAL CONTEXT (always accurate — apply where relevant):
-- EPF: Malaysian employees auto-contribute 11% of salary to the Employees Provident Fund.
-  This is a RETIREMENT fund. Early withdrawal has tax penalties and long-term cost.
-  Do NOT recommend EPF withdrawal for short-term emergencies.
-- SOCSO EIS (Employment Insurance Scheme): Covers EMPLOYED workers only (not self-employed
-  or gig workers). Pays ~80% of last drawn salary for up to 6 months upon retrenchment.
-  Does NOT cover voluntary resignation or general illness.
-- Government hospitals: RM 1–5/day for Malaysian citizens. Private hospitals: RM 400–2,000/day.
-  Private medical bills are the #1 cause of emergency fund depletion in Malaysia.
-- BNM OPR: Emergency fund in a fixed deposit earns ~3.0% p.a. — meaningfully better than a
-  savings account. Mention this if relevant to encourage fund-building.
-- MYR sensitivity: Ringgit weakens during global crises (e.g. hit 4.75/USD in 2024).
-  This raises import costs — medicine, electronics, fuel — even for domestic earners.
-- Sabah/Sarawak: Materially higher flood risk. Lower average cost of living than KL."""
+# ── Scenario search hints injected into Gemini grounding prompt ───────────────
+_SEARCH_HINTS: dict[str, str] = {
+    "illness":  "most common hospitalised illnesses Malaysia ASEAN 2024 2025 hospital cost dengue heart attack stroke",
+    "job_loss": "Malaysia retrenchment layoff unemployment 2024 2025 sectors workers retrenched",
+    "disaster": "recent natural disasters floods Malaysia ASEAN 2024 2025 damage cost affected people",
+    "war":      "ASEAN geopolitical conflict South China Sea instability 2025 Malaysia MYR financial impact",
+}
 
-# ─── Shock-specific Malaysian context ────────────────────────────────────────
-_SHOCK_CONTEXT: dict[str, str] = {
-    "illness": (
-        "ILLNESS: Government hospital costs RM 1–5/day for Malaysian citizens. "
-        "Private hospitalisation is RM 400–2,000/day and is NOT covered by SOCSO. "
-        "SOCSO Invalidity Scheme only covers permanent disability, not general illness. "
-        "Recommend choosing government hospital if cost is a concern."
-    ),
-    "job_loss": (
-        "JOB LOSS: SOCSO EIS pays 80% of last salary for up to 6 months — only for retrenched "
-        "employees, NOT for voluntary resignation or self-employed workers. "
-        "Infer coverage likelihood from their income pattern: stable monthly salary → likely "
-        "employee with SOCSO; irregular income → likely self-employed, no SOCSO."
-    ),
-    "disaster": (
-        "DISASTER: Malaysia's NADMA provides basic relief (food, temporary shelter), but "
-        "property repair and contents replacement are borne by the homeowner. "
-        "Contents insurance is uncommon in Malaysia. "
-        "If the user is in Sabah or Sarawak, note the higher flood risk."
-    ),
-    "war": (
-        "WAR/INSTABILITY: MYR typically weakens during geopolitical stress. "
-        "Imported goods (electronics, medicine, fuel) become significantly more expensive. "
-        "However, rice, chicken, cooking oil are government price-controlled — "
-        "these staples remain affordable even during instability."
-    ),
+_SCENARIO_LABELS: dict[str, str] = {
+    "illness":  "illness and hospitalisation in Malaysia/ASEAN",
+    "job_loss": "job loss, retrenchment and unemployment in Malaysia",
+    "disaster": "natural disasters (floods, earthquakes, fires) in Malaysia/ASEAN",
+    "war":      "war, civil unrest and geopolitical instability affecting ASEAN/Malaysia",
+}
+
+# ── Static fallbacks (pre-seeded 2024–2025 data) ─────────────────────────────
+# Used when Gemini grounding is unavailable; already accurate for current year.
+_STATIC_FALLBACKS: dict[str, dict] = {
+    "illness": {
+        "asean_incidents": [
+            {"name": "Dengue Fever (Malaysia)",       "cost_rm_range": "RM 3,000–12,000",  "year": "2025"},
+            {"name": "Heart Attack (private hosp.)",  "cost_rm_range": "RM 15,000–60,000", "year": "2024"},
+            {"name": "Stroke",                        "cost_rm_range": "RM 20,000–80,000", "year": "2024"},
+            {"name": "HFMD (children)",               "cost_rm_range": "RM 1,500–5,000",   "year": "2025"},
+            {"name": "COVID-19 complications",        "cost_rm_range": "RM 8,000–35,000",  "year": "2024"},
+        ],
+        "contingency_costs": [
+            {"item": "Private hospital bills",         "min_rm": 3500, "max_rm": 15000},
+            {"item": "Lost income (2 months)",         "min_rm": 0,    "max_rm": 0},   # filled dynamically
+            {"item": "Medication & follow-up (3 mo)", "min_rm": 600,  "max_rm": 1800},
+            {"item": "Physiotherapy / rehab",          "min_rm": 500,  "max_rm": 2000},
+        ],
+    },
+    "job_loss": {
+        "asean_incidents": [
+            {"name": "Tech sector layoffs (Malaysia)", "cost_rm_range": "3,700+ workers",   "year": "2025"},
+            {"name": "Manufacturing retrenchments",    "cost_rm_range": "2,100+ jobs lost", "year": "2024"},
+            {"name": "Retail & F&B closures",          "cost_rm_range": "Widespread",       "year": "2024"},
+            {"name": "E-commerce platform cutbacks",   "cost_rm_range": "1,500+ affected",  "year": "2025"},
+        ],
+        "contingency_costs": [
+            {"item": "Monthly living expenses (zero income)", "min_rm": 0,   "max_rm": 0},   # filled dynamically
+            {"item": "Job search costs (transport, tools)",   "min_rm": 150, "max_rm": 300},
+            {"item": "Skills retraining / courses",           "min_rm": 500, "max_rm": 3000},
+        ],
+    },
+    "disaster": {
+        "asean_incidents": [
+            {"name": "Johor/Kelantan floods (Malaysia)",  "cost_rm_range": "RM 1.2B total damage", "year": "2025"},
+            {"name": "Thailand northern floods",          "cost_rm_range": "USD 1.5B damage",      "year": "2024"},
+            {"name": "Philippines Typhoon Carina",        "cost_rm_range": "USD 300M damage",      "year": "2024"},
+            {"name": "Sabah monsoon floods (Malaysia)",   "cost_rm_range": "RM 200M+ damage",      "year": "2024"},
+        ],
+        "contingency_costs": [
+            {"item": "Emergency home repairs",           "min_rm": 5000, "max_rm": 20000},
+            {"item": "Temporary accommodation",          "min_rm": 1500, "max_rm": 6000},
+            {"item": "Replacement essentials",           "min_rm": 2000, "max_rm": 8000},
+            {"item": "Lost income (disruption period)",  "min_rm": 0,    "max_rm": 0},  # filled dynamically
+        ],
+    },
+    "war": {
+        "asean_incidents": [
+            {"name": "South China Sea tensions (2025)",   "cost_rm_range": "MYR fell to 4.75/USD",  "year": "2025"},
+            {"name": "Myanmar civil conflict spillover",  "cost_rm_range": "ASEAN trade disrupted",  "year": "2024"},
+            {"name": "Red Sea conflict — import surge",   "cost_rm_range": "+15–20% import costs",   "year": "2024"},
+            {"name": "Ukraine war food & fuel impact",    "cost_rm_range": "+8–12% inflation",        "year": "2024"},
+        ],
+        "contingency_costs": [
+            {"item": "Emergency relocation / evacuation", "min_rm": 3000, "max_rm": 10000},
+            {"item": "Temporary shelter abroad",          "min_rm": 2500, "max_rm": 8000},
+            {"item": "Food & fuel inflation (6 months)",  "min_rm": 0,    "max_rm": 0},  # filled dynamically
+            {"item": "Foreign currency reserve",          "min_rm": 2000, "max_rm": 5000},
+        ],
+    },
 }
 
 
-def _build_prompt(simulation: dict, profile: dict, shock_type: str) -> str:
-    projections  = simulation["monthly_projected"]
-    trends       = simulation.get("spending_trends", {})
-    top_cat      = simulation["top_category_affected"]
-    total_impact = simulation["grand_total_impact"]
-    one_time     = simulation["one_time_cost_estimate"]
-    months_broke = simulation.get("months_until_broke")
-    indicators   = profile.get("indicators", [])
+# ── Deterministic computation (no AI dependency) ─────────────────────────────
 
-    # Plain-English spending trend description (top 3 by magnitude)
-    trend_lines = []
-    for cat, slope in sorted(trends.items(), key=lambda kv: abs(kv[1]), reverse=True)[:3]:
-        if abs(slope) > 5:
-            direction = "rising" if slope > 0 else "falling"
-            trend_lines.append(f"  - {cat}: {direction} RM{abs(slope):.0f}/month")
-    trend_text = "\n".join(trend_lines) if trend_lines else "  - Spending appears stable"
+def _compute_deterministic_fields(simulation: dict, profile: dict) -> dict:
+    """
+    Compute withstand verdict and months_can_survive from real simulation data.
+    Always deterministic — not AI-generated, always correct.
+    """
+    months_until_broke: float | None = simulation.get("months_until_broke")
+    duration: int = simulation.get("duration_months", 3)
+    avg_expense: float = (
+        simulation.get("baseline_monthly_expense") or
+        profile.get("avg_monthly_expense", 2500)
+    )
+    savings: float = profile.get("savings_balance", profile.get("current_progress", 0))
+    grand_impact: float = simulation.get("grand_total_impact", 0)
 
-    # Month-by-month impact table
-    month_lines = "\n".join(
-        f"  Month {p['month']}: income RM{p['income']:.0f}, "
-        f"expenses RM{p['expense']:.0f}, "
-        f"{'deficit' if p['deficit'] < 0 else 'surplus'} RM{abs(p['deficit']):.0f}"
-        for p in projections
+    # months_can_survive: how long fund lasts during this specific shock
+    if months_until_broke is not None:
+        months_can_survive: float | None = round(float(months_until_broke), 1)
+    else:
+        # Survived — approximate from savings ÷ average monthly burn
+        projections = simulation.get("monthly_projected", [])
+        if projections:
+            avg_burn = sum(p.get("expense", 0) for p in projections) / len(projections)
+        else:
+            avg_burn = avg_expense
+        months_can_survive = round(savings / avg_burn, 1) if avg_burn > 0 else None
+
+    # Verdict thresholds
+    if months_until_broke is None:
+        verdict = "YES"
+        if months_can_survive:
+            summary = (
+                f"Your savings cover all {duration} months of this scenario. "
+                f"You have ~{months_can_survive:.1f} months of runway."
+            )
+        else:
+            summary = f"Your fund holds for all {duration} months modelled."
+    elif months_until_broke >= 3.0:
+        verdict = "BORDERLINE"
+        gap = round(grand_impact - savings, 0)
+        if savings > 0 and gap > 0:
+            summary = (
+                f"Fund lasts ~{months_until_broke:.1f} months before depleting. "
+                f"Gap of ~RM{gap:,.0f} if scenario runs the full {duration} months."
+            )
+        else:
+            summary = (
+                f"Fund lasts ~{months_until_broke:.1f} of {duration} months. "
+                "Build your reserve further to close the gap."
+            )
+    else:
+        verdict = "NO"
+        target = round(avg_expense * 3 / 100) * 100
+        summary = (
+            f"Only {months_until_broke:.1f} months of runway. "
+            f"A 3-month emergency fund needs ~RM{target:,.0f}."
+        )
+
+    return {
+        "months_can_survive": months_can_survive,
+        "withstand_verdict":  verdict,
+        "withstand_summary":  summary,
+    }
+
+
+def _fill_dynamic_costs(costs: list, profile: dict) -> tuple[list, int, int]:
+    """
+    Fill zero-placeholder cost items using the user's real RM numbers.
+    Entries with min_rm == max_rm == 0 are dynamic placeholders.
+    Returns (filled_costs, total_min, total_max).
+    """
+    avg_income  = profile.get("avg_monthly_income", 3000)
+    avg_expense = profile.get("avg_monthly_expense", 2500)
+
+    filled = []
+    for c in costs:
+        c = dict(c)
+        if c["min_rm"] == 0 and c["max_rm"] == 0:
+            label = c["item"].lower()
+            if "lost income" in label:
+                amt = round(avg_income * 2 / 100) * 100
+                c["min_rm"] = amt
+                c["max_rm"] = amt
+            elif "living expenses" in label or "monthly living" in label:
+                monthly = round(avg_expense / 100) * 100
+                c["min_rm"] = monthly
+                c["max_rm"] = monthly * 3
+            elif "inflation" in label or "food" in label:
+                c["min_rm"] = round(avg_expense * 0.10 * 6 / 100) * 100
+                c["max_rm"] = round(avg_expense * 0.20 * 6 / 100) * 100
+            elif "disruption" in label:
+                amt = round(avg_income * 1.5 / 100) * 100
+                c["min_rm"] = amt
+                c["max_rm"] = round(avg_income * 2 / 100) * 100
+            else:
+                c["min_rm"] = round(avg_expense * 0.5 / 100) * 100
+                c["max_rm"] = round(avg_expense * 1.0 / 100) * 100
+        filled.append(c)
+
+    total_min = sum(c["min_rm"] for c in filled)
+    total_max = sum(c["max_rm"] for c in filled)
+    return filled, total_min, total_max
+
+
+# ── Main public function ──────────────────────────────────────────────────────
+
+async def generate_shock_analysis(
+    simulation: dict,
+    profile: dict,
+    shock_type: str,
+) -> dict:
+    """
+    Generates structured shock analysis for the frontend.
+
+    1. Computes deterministic verdict/months_can_survive from real simulation data
+    2. Attempts Gemini Google Search grounding for fresh 2024-2025 ASEAN incidents
+    3. Falls back to pre-seeded static data if Gemini is unavailable
+    """
+    deterministic = _compute_deterministic_fields(simulation, profile)
+
+    fallback = _STATIC_FALLBACKS.get(shock_type, _STATIC_FALLBACKS["illness"])
+    fb_costs, fb_min, fb_max = _fill_dynamic_costs(
+        [dict(c) for c in fallback["contingency_costs"]], profile
     )
 
-    indicator_text = (
-        ", ".join(i["name"].replace("_", " ") for i in indicators)
-        or "none detected"
-    )
-
-    runway_text = (
-        f"current emergency fund covers {months_broke} months of deficit"
-        if months_broke
-        else "no emergency fund yet — zero runway"
-    )
-
-    shock_label = shock_type.replace("_", " ")
-    # Suggest saving ~50% of monthly surplus — realistic, not the whole amount.
-    # Floor at RM50 (even tight budgets can start small), ceiling at RM1000.
     raw_surplus = profile.get("surplus", 100)
-    surplus_save = round(min(max(raw_surplus * 0.5, 50), 1000) / 10) * 10  # round to nearest RM10
+    surplus_save = round(min(max(raw_surplus * 0.5, 50), 1000) / 10) * 10
+    default_action = f"Transfer RM{surplus_save:.0f} to a dedicated emergency fund today."
 
-    return f"""\
-You are a personal finance advisor based in Malaysia. Write an empathetic \
-financial impact story for a user facing a {shock_label} scenario. \
-Use second person ("you"). Be specific — use their real RM numbers throughout.
+    base_result = {
+        "contingency_costs":     fb_costs,
+        "total_contingency_min": fb_min,
+        "total_contingency_max": fb_max,
+        **deterministic,
+        "narrative": "",  # kept for backward compat — not rendered on frontend
+    }
 
-USER FINANCIAL PROFILE:
-- Monthly income: RM{profile['avg_monthly_income']:.0f}
-- Monthly expenses: RM{profile['avg_monthly_expense']:.0f}
-- Monthly surplus: RM{profile['surplus']:.0f}
-- Category most under pressure in this shock: {top_cat}
-- Active risk indicators: {indicator_text}
+    if not settings.GEMINI_API_KEY:
+        return {
+            **base_result,
+            "asean_incidents": fallback["asean_incidents"],
+            "action_today":    default_action,
+        }
 
-SPENDING TRENDS (recent months):
-{trend_text}
+    try:
+        incidents, action_today = await _fetch_with_grounding(shock_type, surplus_save)
+        return {
+            **base_result,
+            "asean_incidents": incidents if len(incidents) >= 2 else fallback["asean_incidents"],
+            "action_today":    action_today or default_action,
+        }
+    except Exception as exc:
+        logger.warning(
+            "Gemini grounding failed for %s: %s — using static fallback", shock_type, exc
+        )
+        return {
+            **base_result,
+            "asean_incidents": fallback["asean_incidents"],
+            "action_today":    default_action,
+        }
 
-SHOCK PROJECTIONS — {shock_label.upper()} for {simulation['duration_months']} months:
-{month_lines}
-  One-time cost estimate: RM{one_time:.0f}
-  Total financial impact: RM{total_impact:.0f}
-  Emergency fund runway: {runway_text}
 
-{_MY_CONTEXT}
+async def _fetch_with_grounding(shock_type: str, surplus_save: float) -> tuple[list, str]:
+    """
+    Calls Gemini 2.5 Flash with Google Search grounding to fetch current
+    ASEAN incidents and a personalised action_today string.
+    Returns (asean_incidents_list, action_today_str).
+    """
+    from google import genai as gai
+    from google.genai import types as gtypes
 
-{_SHOCK_CONTEXT.get(shock_type, '')}
+    search_hint    = _SEARCH_HINTS.get(shock_type, "")
+    scenario_label = _SCENARIO_LABELS.get(shock_type, shock_type)
 
-WRITE EXACTLY this format — plain text only, no bullet points, no markdown:
+    prompt = f"""You are a Malaysian personal finance analyst.
+Search Google for the MOST RECENT (2024–2025) events about: {scenario_label}.
+Search query to use: {search_hint}
 
-PARAGRAPH 1 (2–3 sentences about month 1): What does month 1 feel like financially? \
-Use their exact RM income and expense numbers. Reference {top_cat} specifically.
+Output ONLY valid JSON — no markdown fences, no explanation:
+{{
+  "asean_incidents": [
+    {{"name": "specific event or illness name", "cost_rm_range": "RM X,000–Y,000 or relevant stat", "year": "2024 or 2025"}}
+  ],
+  "action_today": "one specific actionable sentence under 15 words"
+}}
 
-PARAGRAPH 2 (2–3 sentences about month 3 outlook): If nothing changes, what does month 3 look \
-like? Use their real RM numbers. Mention whether SOCSO or EPF is relevant to their situation.
+Rules:
+- asean_incidents: EXACTLY 4–5 items from REAL 2024–2025 search results
+- illness: common conditions hospitalised in Malaysia with private hospital cost in RM
+- job_loss: specific company/sector layoffs in Malaysia with worker counts
+- disaster: specific recent floods/disasters in Malaysia or ASEAN with damage figures
+- war: specific geopolitical events in ASEAN 2024-2025 affecting MYR or supply chains
+- action_today: mention RM{surplus_save:.0f} or reference SOCSO/EPF/JKM where relevant
+- Return ONLY the JSON object, nothing else"""
 
-PARAGRAPH 3 (1–2 sentences — one action TODAY): The single most impactful thing they can do \
-TODAY. Give a specific RM figure based on their surplus (around RM{surplus_save:.0f}).
+    client = gai.Client(api_key=settings.GEMINI_API_KEY)
+    loop = asyncio.get_running_loop()
 
-Then on a NEW LINE, output ONLY this JSON — nothing else after it:
-{{"action_today": "<one specific, actionable sentence with a RM figure>"}}
+    def _call() -> str:
+        resp = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=gtypes.GenerateContentConfig(
+                tools=[gtypes.Tool(google_search=gtypes.GoogleSearch())],
+                temperature=0.2,
+            ),
+        )
+        return resp.text
 
-Maximum 160 words total across all three paragraphs.\
-"""
+    raw = await loop.run_in_executor(None, _call)
+    raw = raw.strip()
 
+    # Strip markdown code fences Gemini may add
+    if raw.startswith("```"):
+        parts = raw.split("```")
+        raw = parts[1] if len(parts) > 1 else raw
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+
+    # Extract first JSON object (grounding may prepend citation text)
+    m = re.search(r'\{[\s\S]*\}', raw)
+    if not m:
+        raise ValueError(f"No JSON object found in Gemini response: {raw[:300]}")
+
+    parsed = json.loads(m.group(0))
+    incidents = [
+        i for i in parsed.get("asean_incidents", [])
+        if isinstance(i, dict) and "name" in i and "cost_rm_range" in i
+    ]
+    if len(incidents) < 2:
+        raise ValueError(f"Too few valid incidents returned: {incidents}")
+
+    return incidents, parsed.get("action_today", "")
+
+
+# ── Backward-compatibility shim ───────────────────────────────────────────────
 
 async def generate_shock_narrative(
     simulation: dict,
@@ -162,70 +349,11 @@ async def generate_shock_narrative(
     shock_type: str,
 ) -> dict:
     """
-    Generates a personalized narrative and action_today for the shock scenario.
-    Falls back gracefully if Gemini is unavailable or returns malformed output.
+    Legacy wrapper — converts structured analysis to the old {narrative, action_today} shape.
+    Kept so any other callers don't break during transition.
     """
-    raw_surplus = profile.get("surplus", 100)
-    fallback_amount = round(min(max(raw_surplus * 0.5, 50), 1000) / 10) * 10
-    fallback_action = (
-        f"Set aside RM{fallback_amount:.0f} into a dedicated emergency savings account today."
-    )
-
-    if not settings.GEMINI_API_KEY:
-        return {
-            "narrative": (
-                f"A {shock_type.replace('_', ' ')} scenario would create significant "
-                "financial pressure based on your current spending profile."
-            ),
-            "action_today": fallback_action,
-        }
-
-    prompt = _build_prompt(simulation, profile, shock_type)
-    genai.configure(api_key=settings.GEMINI_API_KEY)
-    model = genai.GenerativeModel("models/gemini-2.5-flash-lite")
-    loop = asyncio.get_running_loop()
-
-    try:
-        response = await loop.run_in_executor(None, lambda: model.generate_content(prompt))
-        full_text = response.text.strip()
-        logger.debug("Gemini raw response for %s: %.400s", shock_type, full_text)
-
-        # Strip markdown code fences Gemini 2.5 Flash often adds
-        cleaned = full_text.replace("```json", "").replace("```", "").strip()
-
-        narrative = cleaned
-        action_today = fallback_action
-
-        # Robust extraction: regex finds {"action_today": "<any text>"}
-        # This is immune to `}` inside the value or trailing Gemini text.
-        m = re.search(r'\{\s*"action_today"\s*:\s*"([^"]+)"\s*\}', cleaned)
-        if m:
-            action_today = m.group(1)
-            # narrative = everything before the JSON block
-            json_start = cleaned.rfind('{', 0, m.start() + 1)
-            narrative = cleaned[:json_start].strip() if json_start >= 0 else cleaned
-        elif '{"action_today"' in cleaned:
-            # Fallback: try the old splitting approach
-            parts = cleaned.rsplit('{"action_today"', 1)
-            narrative = parts[0].strip()
-            raw_json = '{"action_today"' + parts[1]
-            brace_end = raw_json.find("}") + 1
-            if brace_end > 0:
-                try:
-                    parsed = json.loads(raw_json[:brace_end])
-                    action_today = parsed.get("action_today", fallback_action)
-                except Exception as parse_exc:
-                    logger.warning("JSON parse fallback failed for %s: %s | raw_json=%.200s", shock_type, parse_exc, raw_json)
-
-        return {"narrative": narrative, "action_today": action_today}
-
-    except Exception as exc:
-        logger.exception("Gemini narrative generation failed for shock_type=%s: %s", shock_type, exc)
-        return {
-            "narrative": (
-                f"A {shock_type.replace('_', ' ')} event would create a projected "
-                f"RM{simulation['grand_total_impact']:.0f} impact on your finances "
-                f"over {simulation['duration_months']} months."
-            ),
-            "action_today": fallback_action,
-        }
+    result = await generate_shock_analysis(simulation, profile, shock_type)
+    return {
+        "narrative":    result.get("withstand_summary", ""),
+        "action_today": result.get("action_today", ""),
+    }

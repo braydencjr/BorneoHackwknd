@@ -27,7 +27,7 @@ from app.models.transactions import Transaction
 from app.services.contingency_service import calculate_plan, update_progress
 from app.services.vulnerability_profiler import build_vulnerability_profile
 from app.services.shock_simulation_service import run_shock_simulation
-from app.services.shock_narrative_service import generate_shock_narrative
+from app.services.shock_narrative_service import generate_shock_analysis
 from app.services.regional_risk_service import fetch_or_refresh_risks
 
 router = APIRouter()
@@ -266,13 +266,25 @@ async def get_shock_simulation(
         regional_severity = regional_severity,
     )
 
-    # ── 5. Gemini narrative with full Malaysian context ────────────────────────
-    narrative = await generate_shock_narrative(simulation, profile, shock_type)
+    # ── 5. Structured AI analysis (replaces free-text narrative) ───────────────
+    # Enrich profile with savings balance so analysis can compute withstand verdict
+    profile_enriched = {**profile, "savings_balance": current_progress}
+    ai_analysis = await generate_shock_analysis(simulation, profile_enriched, shock_type)
 
     return {
         **simulation,
-        **narrative,
-        "regional_risks": regional_risks[:3],
+        # Structured analysis fields (new)
+        "asean_incidents":        ai_analysis.get("asean_incidents", []),
+        "contingency_costs":      ai_analysis.get("contingency_costs", []),
+        "total_contingency_min":  ai_analysis.get("total_contingency_min", 0),
+        "total_contingency_max":  ai_analysis.get("total_contingency_max", 0),
+        "withstand_verdict":      ai_analysis.get("withstand_verdict", "BORDERLINE"),
+        "withstand_summary":      ai_analysis.get("withstand_summary", ""),
+        "months_can_survive":     ai_analysis.get("months_can_survive", None),
+        "action_today":           ai_analysis.get("action_today", ""),
+        # Legacy — kept for backward compat, no longer rendered on frontend
+        "narrative":              "",
+        "regional_risks":         regional_risks[:3],
     }
 
 

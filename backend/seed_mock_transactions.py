@@ -17,6 +17,12 @@ async def seed_data():
         await conn.run_sync(Base.metadata.create_all)
 
     async with AsyncSessionLocal() as session:
+        # Clear existing transactions for user 1 so re-seeding is idempotent
+        from sqlalchemy import delete
+        await session.execute(delete(Transaction).where(Transaction.user_id == 1))
+        await session.commit()
+        print("Cleared existing transactions for user 1.")
+
         # Check if user 1 exists, if not, create a dummy user
         user = await session.get(User, 1)
         if not user:

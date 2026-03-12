@@ -684,6 +684,23 @@ function OverviewErrorState({ message, onRetry }: { message: string; onRetry: ()
   );
 }
 
+// ─── Overview empty state (stream done but no data received) ──────────────────
+function OverviewEmptyState({ onScan }: { onScan: () => void }) {
+  return (
+    <View style={ovStyles.errorState}>
+      <Text style={{ fontSize: 40, marginBottom: 8 }}>📊</Text>
+      <Text style={ovStyles.errorTitle}>No data yet</Text>
+      <Text style={ovStyles.errorMsg}>
+        Tap below to run your financial health scan.
+      </Text>
+      <Pressable onPress={onScan} style={ovStyles.retryBtn}>
+        <Ionicons name="pulse-outline" size={16} color="#fff" style={{ marginRight: 6 }} />
+        <Text style={ovStyles.retryBtnText}>Run Health Scan</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // ─── Scenarios Tab ────────────────────────────────────────────────────────────
 function ScenariosTab({
   shock,
@@ -833,6 +850,9 @@ export default function ResiliencePage() {
               message={overviewScan.error}
               onRetry={overviewScan.refresh}
             />
+          ) : !overviewScan.score && !overviewScan.isLoading ? (
+            // Stream finished but no data — prompt user to scan
+            <OverviewEmptyState onScan={overviewScan.refresh} />
           ) : (
             // At least score is available — render dashboard
             <View style={styles.dashboardSection}>

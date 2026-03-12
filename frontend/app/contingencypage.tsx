@@ -32,6 +32,19 @@ interface MonthProjection {
   expense: number;           // total projected expenses
   deficit: number;          // income - expense (negative = shortfall)
 }
+
+interface AseanIncident {
+  name: string;
+  cost_rm_range: string;
+  year: string;
+}
+
+interface ContingencyCost {
+  item: string;
+  min_rm: number;
+  max_rm: number;
+}
+
 interface ShockReport {
   shock_type: string;
   severity_label: string;    // "moderate" | "severe" | "critical"
@@ -43,6 +56,15 @@ interface ShockReport {
   one_time_cost_estimate: number;
   baseline_monthly_income: number;
   baseline_monthly_expense: number;
+  // Structured analysis fields (v2)
+  asean_incidents?:       AseanIncident[];
+  contingency_costs?:     ContingencyCost[];
+  total_contingency_min?: number;
+  total_contingency_max?: number;
+  withstand_verdict?:     "YES" | "BORDERLINE" | "NO";
+  withstand_summary?:     string;
+  months_can_survive?:    number | null;
+  // Legacy (kept for backward compat)
   narrative: string;
   action_today: string;
   regional_risks: { event_title: string; severity: number; source_url: string }[];
@@ -79,6 +101,208 @@ const TAB_CONTEXT: Record<string, string> = {
   C: "Natural disasters create sudden repair costs and supply disruptions.",
   D: "Currency instability raises all expense categories — especially fixed ones.",
 };
+
+// ── ASEAN Incidents Section ───────────────────────────────────────────────────
+const INCIDENT_SECTION_META: Record<string, { emoji: string; title: string; chipBg: string; dotColor: string }> = {
+  A: { emoji: "🏥", title: "COMMON ILLNESSES IN ASEAN (2024–2025)", chipBg: "#FEE2E2", dotColor: "#EF4444" },
+  B: { emoji: "💼", title: "RECENT RETRENCHMENTS IN MALAYSIA (2025)", chipBg: "#FFF7ED", dotColor: "#F97316" },
+  C: { emoji: "🌊", title: "RECENT DISASTERS IN ASEAN (2024–2025)", chipBg: "#EFF6FF", dotColor: "#3B82F6" },
+  D: { emoji: "⚠️", title: "GEOPOLITICAL EVENTS AFFECTING ASEAN (2024–2025)", chipBg: "#F5F3FF", dotColor: "#7C3AED" },
+};
+
+function AseanIncidentsSection({ incidents, tabKey }: { incidents: AseanIncident[]; tabKey: string }) {
+  if (!incidents || incidents.length === 0) return null;
+  const meta = INCIDENT_SECTION_META[tabKey] ?? INCIDENT_SECTION_META.A;
+  return (
+    <View style={aStyles.card}>
+      <View style={aStyles.cardHeader}>
+        <Text style={aStyles.cardHeaderEmoji}>{meta.emoji}</Text>
+        <Text style={aStyles.cardHeaderTitle}>{meta.title}</Text>
+      </View>
+      {incidents.map((item, i) => (
+        <View key={i} style={[aStyles.incidentRow, i < incidents.length - 1 && aStyles.incidentRowBorder]}>
+          <View style={[aStyles.incidentDot, { backgroundColor: meta.dotColor }]} />
+          <Text style={aStyles.incidentName} numberOfLines={2}>{item.name}</Text>
+          <View style={[aStyles.costChip, { backgroundColor: meta.chipBg }]}>
+            <Text style={[aStyles.costChipText, { color: meta.dotColor }]}>{item.cost_rm_range}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function ContingencyCostSection({
+  costs, totalMin, totalMax,
+}: { costs: ContingencyCost[]; totalMin: number; totalMax: number }) {
+  if (!costs || costs.length === 0) return null;
+  const fmtA = (n: number) => n >= 1000 ? `RM ${(n / 1000).toFixed(0)}k` : `RM ${n}`;
+  const fmtR = (min: number, max: number) => min === max ? fmtA(min) : `${fmtA(min)} – ${fmtA(max)}`;
+  return (
+    <View style={aStyles.card}>
+      <View style={aStyles.cardHeader}>
+        <Text style={aStyles.cardHeaderEmoji}>💰</Text>
+        <Text style={aStyles.cardHeaderTitle}>WHAT YOU NEED TO PREPARE</Text>
+      </View>
+      {costs.map((c, i) => (
+        <View key={i} style={[aStyles.costRow, i < costs.length - 1 && aStyles.incidentRowBorder]}>
+          <Text style={aStyles.costItem}>{c.item}</Text>
+          <Text style={aStyles.costValue}>{fmtR(c.min_rm, c.max_rm)}</Text>
+        </View>
+      ))}
+      <View style={aStyles.costTotalRow}>
+        <Text style={aStyles.costTotalLabel}>Total estimated</Text>
+        <Text style={aStyles.costTotalValue}>{fmtR(totalMin, totalMax)}</Text>
+      </View>
+    </View>
+  );
+}
+
+const VERDICT_META: Record<string, { bg: string; border: string; color: string; pillBg: string; icon: string; label: string }> = {
+  YES:       { bg: "#F0FDF4", border: "#16A34A", color: "#16A34A", pillBg: "#DCFCE7", icon: "✓", label: "CAN WITHSTAND" },
+  BORDERLINE:{ bg: "#FFFBEB", border: "#D97706", color: "#B45309", pillBg: "#FEF3C7", icon: "⚠", label: "BORDERLINE"   },
+  NO:        { bg: "#FFF1F2", border: "#DC2626", color: "#DC2626", pillBg: "#FEE2E2", icon: "✗", label: "AT RISK"       },
+};
+
+function WithstandVerdict({
+  verdict, summary, monthsCanSurvive, isJobLoss,
+}: { verdict: string; summary: string; monthsCanSurvive: number | null; isJobLoss: boolean; }) {
+  if (!verdict) return null;
+  const meta = VERDICT_META[verdict] ?? VERDICT_META.BORDERLINE;
+  const barPct = Math.min(((monthsCanSurvive ?? 0) / 12) * 100, 100);
+  return (
+    <View style={[aStyles.verdictCard, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+      <View style={[aStyles.verdictPill, { backgroundColor: meta.pillBg }]}>
+        <Text style={[aStyles.verdictPillText, { color: meta.color }]}>{meta.icon}  {meta.label}</Text>
+      </View>
+      {summary ? <Text style={aStyles.verdictSummary}>{summary}</Text> : null}
+      {isJobLoss && monthsCanSurvive !== null && (
+        <View style={aStyles.survivalBlock}>
+          <View style={aStyles.survivalLabelRow}>
+            <Text style={aStyles.survivalLabel}>Survival on RM 0 income</Text>
+            <Text style={[aStyles.survivalMonths, { color: meta.color }]}>
+              {monthsCanSurvive.toFixed(1)}{" "}
+              <Text style={aStyles.survivalMonthsUnit}>months</Text>
+            </Text>
+          </View>
+          <View style={aStyles.survivalBarTrack}>
+            <View style={[aStyles.survivalBarFill, { width: `${barPct}%` as any, backgroundColor: meta.border }]} />
+          </View>
+          <View style={aStyles.survivalBarLabels}>
+            <Text style={aStyles.survivalBarLabelText}>0</Text>
+            <Text style={aStyles.survivalBarLabelText}>6 mo</Text>
+            <Text style={aStyles.survivalBarLabelText}>12 mo</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const aStyles = StyleSheet.create({
+  card: {
+    marginTop: 18,
+    backgroundColor: "#FAFAFA",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    overflow: "hidden",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    backgroundColor: "#F3F4F6",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  cardHeaderEmoji: { fontSize: 16 },
+  cardHeaderTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#374151",
+    letterSpacing: 0.6,
+    flexShrink: 1,
+  },
+  incidentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  incidentRowBorder: { borderBottomWidth: 1, borderBottomColor: "#E5E7EB" },
+  incidentDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0, marginTop: 1 },
+  incidentName: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    fontSize: 13,
+    color: "#1F2937",
+    lineHeight: 19,
+  },
+  costChip: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, flexShrink: 0 },
+  costChipText: { fontSize: 11, fontWeight: "700" },
+  costRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  costItem: { flex: 1, fontSize: 13, color: "#374151", lineHeight: 18 },
+  costValue: { fontSize: 13, fontWeight: "600", color: "#1F2937", flexShrink: 0 },
+  costTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderTopWidth: 1.5,
+    borderTopColor: "#E5E7EB",
+    backgroundColor: "#F9FAFB",
+  },
+  costTotalLabel: { fontSize: 13, fontWeight: "700", color: "#1F2937" },
+  costTotalValue: { fontSize: 16, fontWeight: "800", color: "#DC2626" },
+  verdictCard: {
+    marginTop: 18,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    padding: 18,
+    alignItems: "center",
+    gap: 12,
+  },
+  verdictPill: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 999,
+    alignSelf: "center",
+  },
+  verdictPillText: { fontSize: 15, fontWeight: "800", letterSpacing: 1.2 },
+  verdictSummary: {
+    fontSize: 13,
+    color: "#374151",
+    lineHeight: 20,
+    textAlign: "center",
+    paddingHorizontal: 4,
+  },
+  survivalBlock: { width: "100%", gap: 6 },
+  survivalLabelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  survivalLabel: { fontSize: 12, color: "#6B7280", fontWeight: "500" },
+  survivalMonths: { fontSize: 18, fontWeight: "800" },
+  survivalMonthsUnit: { fontSize: 12, fontWeight: "500", color: "#6B7280" },
+  survivalBarTrack: { height: 12, backgroundColor: "rgba(0,0,0,0.08)", borderRadius: 6, overflow: "hidden" },
+  survivalBarFill: { height: "100%", borderRadius: 6 },
+  survivalBarLabels: { flexDirection: "row", justifyContent: "space-between" },
+  survivalBarLabelText: { fontSize: 10, color: "#9CA3AF" },
+});
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function ContingencyPage() {
   const { width: screenWidth } = Dimensions.get("window");
@@ -200,13 +424,17 @@ export default function ContingencyPage() {
     }
 
     // ── Full shock simulation card ──────────────────────────────────────────
-    // months_until_broke: how long the fund lasts; cap at duration for display
     const fundMonths = Math.min(shock.months_until_broke ?? shock.duration_months, shock.duration_months);
     const coveragePct = Math.min((fundMonths / shock.duration_months) * 100, 100);
     const coverageColor = coveragePct >= 80 ? "#10B981" : coveragePct >= 40 ? "#F59E0B" : "#EF4444";
 
     return (
       <View style={styles.cardInner}>
+
+        {/* Scenario context */}
+        <View style={styles.contextBox}>
+          <Text style={styles.contextBoxText}>{TAB_CONTEXT[selectedTab]}</Text>
+        </View>
 
         {/* Severity badge */}
         <View style={styles.severityRow}>
@@ -216,7 +444,7 @@ export default function ContingencyPage() {
             <Text style={[styles.severityText, {
               color: shock.severity_label === "critical" ? "#7F1D1D" : shock.severity_label === "severe" ? "#DC2626" : "#92400E",
             }]}>
-              {shock.severity_label === "critical" ? "🔴 Critical scenario" : shock.severity_label === "severe" ? "🔴 Severe scenario" : "🟡 Moderate scenario"}
+              {shock.severity_label === "critical" ? "🔴 Critical" : shock.severity_label === "severe" ? "🔴 Severe" : "🟡 Moderate"}
             </Text>
           </View>
         </View>
@@ -224,10 +452,7 @@ export default function ContingencyPage() {
         {/* Fund coverage bar */}
         <Text style={styles.coverageLabel}>Fund coverage for this scenario</Text>
         <View style={styles.coverageBar}>
-          <View style={[styles.coverageFill, {
-            width: `${coveragePct}%` as any,
-            backgroundColor: coverageColor,
-          }]} />
+          <View style={[styles.coverageFill, { width: `${coveragePct}%` as any, backgroundColor: coverageColor }]} />
         </View>
         <Text style={[styles.coverageSub, { color: coverageColor }]}>
           {fundMonths.toFixed(1)} / {shock.duration_months} months covered
@@ -247,9 +472,10 @@ export default function ContingencyPage() {
           </View>
         )}
 
-        {/* Monthly mini-table */}
+        {/* Monthly projection */}
+        <Text style={styles.tableSectionLabel}>📅  3-MONTH PROJECTION</Text>
         <View style={styles.tableHeader}>
-          <Text style={styles.tableCell}>Mo.</Text>
+          <Text style={styles.tableCell}>Mo</Text>
           <Text style={styles.tableCell}>Income</Text>
           <Text style={styles.tableCell}>Expenses</Text>
           <Text style={[styles.tableCell, { color: "#1E3A8A" }]}>Net</Text>
@@ -265,13 +491,19 @@ export default function ContingencyPage() {
           </View>
         ))}
 
-        {/* AI Narrative */}
-        {shock.narrative ? (
-          <View style={styles.narrativeBox}>
-            <Text style={styles.narrativeTitle}>📊 AI Analysis</Text>
-            <Text style={styles.narrativeText}>{shock.narrative}</Text>
-          </View>
-        ) : null}
+        {/* Incidents / costs / verdict */}
+        <AseanIncidentsSection incidents={shock.asean_incidents ?? []} tabKey={selectedTab} />
+        <ContingencyCostSection
+          costs={shock.contingency_costs ?? []}
+          totalMin={shock.total_contingency_min ?? 0}
+          totalMax={shock.total_contingency_max ?? 0}
+        />
+        <WithstandVerdict
+          verdict={shock.withstand_verdict ?? "BORDERLINE"}
+          summary={shock.withstand_summary ?? ""}
+          monthsCanSurvive={shock.months_can_survive ?? null}
+          isJobLoss={selectedTab === "B"}
+        />
 
         {/* Action callout */}
         {shock.action_today ? (
@@ -773,67 +1005,71 @@ riskBadgeText: {
 
   // ── Shock simulation card styles ─────────────────────────────────────────
   severityRow: {
-    marginTop:15,
-    marginBottom: 10,
+    marginTop: 4,
+    marginBottom: 16,
   },
   severityBadge: {
     alignSelf: "flex-start",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
   },
   severityText: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 13,
+    fontWeight: "700",
   },
   coverageLabel: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 7,
   },
   coverageBar: {
-    height: 10,
+    height: 14,
     backgroundColor: "#E5E7EB",
-    borderRadius: 5,
+    borderRadius: 7,
     overflow: "hidden",
-    marginBottom: 4,
+    marginBottom: 7,
   },
   coverageFill: {
     height: "100%",
-    borderRadius: 5,
+    borderRadius: 7,
   },
   coverageSub: {
-    fontSize: 11,
-    marginBottom: 10,
+    fontSize: 12,
+    marginBottom: 18,
   },
   shortfallChip: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    alignItems: "flex-start",
+    gap: 8,
     backgroundColor: "#FEE2E2",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 12,
+    borderRadius: 10,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    marginBottom: 18,
   },
   shortfallChipText: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#DC2626",
     fontWeight: "600",
     flex: 1,
+    lineHeight: 19,
   },
   tableHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    marginBottom: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 8,
+    marginBottom: 2,
   },
   tableRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 5,
+    paddingVertical: 11,
+    paddingHorizontal: 6,
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
   },
@@ -841,10 +1077,31 @@ riskBadgeText: {
     backgroundColor: "#FFF5F5",
   },
   tableCell: {
-    fontSize: 11,
+    fontSize: 13,
     color: "#374151",
     flex: 1,
     textAlign: "center",
+  },
+  contextBox: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 10,
+    padding: 13,
+    marginBottom: 14,
+    borderLeftWidth: 3,
+    borderLeftColor: "#93C5FD",
+  },
+  contextBoxText: {
+    fontSize: 13,
+    color: "#1E40AF",
+    lineHeight: 20,
+  },
+  tableSectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6B7280",
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginTop: 18,
   },
   narrativeBox: {
     backgroundColor: "#EFF6FF",
