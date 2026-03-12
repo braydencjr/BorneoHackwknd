@@ -45,6 +45,12 @@ engine = create_async_engine(
     echo=settings.DB_ECHO,
     future=True,
     connect_args=_connect_args,
+
+    # New settings to avoid connection being dropped after long idle
+    pool_pre_ping=True,      # Checks if connection is alive before every use
+    pool_recycle=3600,       # Force refresh connections every hour
+    pool_size=10,            # Adjust based on your load
+    max_overflow=20,         # Allow some bursting
 )
 
 AsyncSessionLocal = async_sessionmaker(

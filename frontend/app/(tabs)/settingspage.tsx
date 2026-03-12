@@ -36,7 +36,7 @@ export default function SettingsPage() {
       const data = await authService.me();
 
       if (!data) {
-        router.replace("/loginpage");
+        router.replace("/Login");
         return;
       }
 
