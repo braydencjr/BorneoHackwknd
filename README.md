@@ -1,4 +1,4 @@
-# FinSight — BorneoHackwknd
+# FinSight — Team Gardenia
 
 **FinSight** is an **AI-powered financial resilience app** designed to help Malaysian households understand their spending, prepare for unexpected financial shocks, and build stronger financial habits. By transforming everyday financial data into **clear insights and actionable guidance**, FinSight empowers users to make smarter financial decisions through a simple, mobile-first experience.
 
