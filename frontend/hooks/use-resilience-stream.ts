@@ -87,6 +87,12 @@ export type SurvivalAction = {
   description: string;
 };
 
+export type ShockRisk = {
+  name: string;
+  cost_rm: string;
+  note: string;
+};
+
 export type ShockData = {
   card: 'shock';
   scenario: string;
@@ -111,6 +117,15 @@ export type ShockData = {
   };
   risk_probability?: string;
   insurance_gap_note?: string;
+  // Structured AI analysis fields (new)
+  common_risks?: ShockRisk[];
+  contingency_needed_rm?: string;
+  can_user_withstand?: boolean;
+  withstand_summary?: string;
+  survival_months?: number;
+  key_actions?: string[];
+  action_today?: string;
+  narrative?: string;
 };
 
 export type StressTestScenario = {
