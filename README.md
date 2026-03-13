@@ -1,8 +1,13 @@
+<p align="center">
+  <img src="docs/FinSight Logo.jpeg" alt="FinSight Logo" width="250">
+</p>
+
+---
 # FinSight — Team Gardenia
 
 **FinSight** is an **AI-powered financial resilience app** designed to help Malaysian households understand their spending, prepare for unexpected financial shocks, and build stronger financial habits. By transforming everyday financial data into **clear insights and actionable guidance**, FinSight empowers users to make smarter financial decisions through a simple, mobile-first experience.
 
-[![Demo Video](https://img.shields.io/badge/Demo-Video-blue?style=for-the-badge&logo=youtube)](https://drive.google.com/file/d/17eHvtSeXJm6nbHa1VXO5Yy51ptUI8oLk/view?usp=sharing)  [![Canva Presentation](https://img.shields.io/badge/Canva-Demo-blueviolet?style=for-the-badge&logo=canva)](https://www.canva.com/design/DAHDpbsqoQI/FnJ-RtYcV3_elZGQy2kckQ/edit?utm_content=DAHDpbsqoQI&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
+[![Pitching Video](https://img.shields.io/badge/Pitching-Video-blue?style=for-the-badge&logo=youtube)](https://drive.google.com/file/d/17eHvtSeXJm6nbHa1VXO5Yy51ptUI8oLk/view?usp=sharing)  [![Canva Presentation](https://img.shields.io/badge/Canva-Presentation-blueviolet?style=for-the-badge&logo=canva)](https://www.canva.com/design/DAHDpbsqoQI/FnJ-RtYcV3_elZGQy2kckQ/edit?utm_content=DAHDpbsqoQI&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)  [![Documentation](https://img.shields.io/badge/Documentation-Official-brightgreen?style=for-the-badge&logo=read-the-docs&logoColor=white)](YOUR_DOCS_LINK_HERE)
 
 FinSight aims to promote **financial literacy, resilience, and preparedness** in an increasingly uncertain world.
 
