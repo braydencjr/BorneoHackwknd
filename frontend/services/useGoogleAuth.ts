@@ -18,9 +18,7 @@ WebBrowser.maybeCompleteAuthSession();
  * In Expo Go (development), only the web clientId is required.
  */
 export function useGoogleAuth() {
-  const webId =
-    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ??
-    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+  const webId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
 
   const [request, response, promptAsync] = Google.useAuthRequest({
     clientId: webId,
