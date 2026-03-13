@@ -7,7 +7,7 @@
 
 **FinSight** is an **AI-powered financial resilience app** designed to help Malaysian households understand their spending, prepare for unexpected financial shocks, and build stronger financial habits. By transforming everyday financial data into **clear insights and actionable guidance**, FinSight empowers users to make smarter financial decisions through a simple, mobile-first experience.
 
-[![Pitching Video](https://img.shields.io/badge/Pitching-Video-blue?style=for-the-badge&logo=youtube)](https://drive.google.com/file/d/17eHvtSeXJm6nbHa1VXO5Yy51ptUI8oLk/view?usp=sharing)  [![Canva Presentation](https://img.shields.io/badge/Canva-Presentation-blueviolet?style=for-the-badge&logo=canva)](https://drive.google.com/file/d/1wrU6fbFpXHSWaIZqs-6gRyPeX3jya_5Q/view?usp=sharing)  [![Documentation](https://img.shields.io/badge/Documentation-Official-brightgreen?style=for-the-badge&logo=read-the-docs&logoColor=white)](https://drive.google.com/file/d/1GYjQQ1sVpSZSsi7vdbw3Uzy3-vdc1knC/view?usp=sharing)
+[![Pitching Video](https://img.shields.io/badge/Pitching-Video-blue?style=for-the-badge&logo=youtube)](https://drive.google.com/file/d/17eHvtSeXJm6nbHa1VXO5Yy51ptUI8oLk/view?usp=sharing)  [![Canva Presentation](https://img.shields.io/badge/Canva-Presentation-blueviolet?style=for-the-badge&logo=canva)](https://drive.google.com/file/d/1wrU6fbFpXHSWaIZqs-6gRyPeX3jya_5Q/view?usp=sharing)  [![Documentation](https://img.shields.io/badge/Documentation-Official-brightgreen?style=for-the-badge&logo=read-the-docs&logoColor=white)](https://drive.google.com/file/d/1GnBLPcu_IX_DxUeeFJX4lA_yOWAgwaZg/view?usp=drive_link)
 
 FinSight aims to promote **financial literacy, resilience, and preparedness** in an increasingly uncertain world.
 
