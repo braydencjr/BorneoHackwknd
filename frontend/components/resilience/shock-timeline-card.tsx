@@ -25,6 +25,7 @@ const PHASE_COLORS: Record<string, string> = {
 
 type Props = { data: ShockData };
 
+// ─── Timeline bar row ─────────────────────────────────────────────────────────
 function TimelineBar({ month, delay }: { month: ShockData['timeline'][number]; delay: number }) {
   const barWidth = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -89,6 +90,7 @@ function TimelineBar({ month, delay }: { month: ShockData['timeline'][number]; d
   );
 }
 
+// ─── Phase legend ─────────────────────────────────────────────────────────────
 function PhaseLegend({ phases }: { phases: ShockData['phases'] }) {
   if (!phases || phases.length === 0) return null;
   return (
@@ -106,6 +108,105 @@ function PhaseLegend({ phases }: { phases: ShockData['phases'] }) {
   );
 }
 
+// ─── AI Analysis section — structured, concise ───────────────────────────────
+function AIAnalysisSection({ data }: { data: ShockData }) {
+  const hasStructured = !!(data.common_risks?.length || data.contingency_needed_rm || data.key_actions?.length);
+  if (!hasStructured) return null;
+
+  const withstand = data.can_user_withstand;
+  const withstandColor = withstand ? '#16A34A' : '#DC2626';
+  const withstandBg = withstand ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)';
+  const withstandBorder = withstand ? 'rgba(22,163,74,0.25)' : 'rgba(220,38,38,0.2)';
+
+  const isJobLoss = data.scenario === 'job_loss';
+
+  return (
+    <View style={aiStyles.section}>
+      <Text style={aiStyles.heading}>🧠 AI ANALYSIS</Text>
+
+      {/* Job loss: survival months banner */}
+      {isJobLoss && data.survival_months !== undefined && (
+        <View style={[aiStyles.survivalBanner, { backgroundColor: data.survival_months >= 3 ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.07)', borderColor: data.survival_months >= 3 ? 'rgba(22,163,74,0.2)' : 'rgba(220,38,38,0.2)' }]}>
+          <Text style={aiStyles.survivalLabel}>AT RM 0 INCOME</Text>
+          <Text style={[aiStyles.survivalMonths, { color: data.survival_months >= 3 ? '#16A34A' : '#DC2626' }]}>
+            {data.survival_months.toFixed(1)} months
+          </Text>
+          <Text style={aiStyles.survivalSub}>you can survive on current savings</Text>
+        </View>
+      )}
+
+      {/* Common risks */}
+      {data.common_risks && data.common_risks.length > 0 && (
+        <View style={aiStyles.block}>
+          <Text style={aiStyles.blockLabel}>
+            {data.scenario === 'illness' ? '🦠 COMMON ILLNESSES' :
+             data.scenario === 'disaster' ? '🌪 RECENT EVENTS' :
+             data.scenario === 'war' ? '⚡ RISK FACTORS' :
+             '📋 COMMON RISKS'}
+          </Text>
+          {data.common_risks.map((risk, i) => (
+            <View key={i} style={aiStyles.riskRow}>
+              <View style={aiStyles.riskLeft}>
+                <Text style={aiStyles.riskName}>{risk.name}</Text>
+                <Text style={aiStyles.riskNote}>{risk.note}</Text>
+              </View>
+              <View style={aiStyles.riskCostBadge}>
+                <Text style={aiStyles.riskCost}>{risk.cost_rm}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Contingency needed + withstand verdict */}
+      {data.contingency_needed_rm && (
+        <View style={[aiStyles.verdictBox, { backgroundColor: withstandBg, borderColor: withstandBorder }]}>
+          <View style={aiStyles.verdictTop}>
+            <View>
+              <Text style={aiStyles.verdictLabel}>CONTINGENCY NEEDED</Text>
+              <Text style={[aiStyles.verdictAmount, { color: withstandColor }]}>
+                {data.contingency_needed_rm}
+              </Text>
+            </View>
+            <View style={[aiStyles.withstandBadge, { backgroundColor: withstandColor + '18', borderColor: withstandColor + '44' }]}>
+              <Text style={[aiStyles.withstandText, { color: withstandColor }]}>
+                {withstand ? '✓ CAN WITHSTAND' : '✗ AT RISK'}
+              </Text>
+            </View>
+          </View>
+          {data.withstand_summary && (
+            <Text style={aiStyles.verdictSummary}>{data.withstand_summary}</Text>
+          )}
+        </View>
+      )}
+
+      {/* Key actions */}
+      {data.key_actions && data.key_actions.length > 0 && (
+        <View style={aiStyles.block}>
+          <Text style={aiStyles.blockLabel}>⚡ KEY ACTIONS</Text>
+          {data.key_actions.map((action, i) => (
+            <View key={i} style={aiStyles.actionRow}>
+              <View style={aiStyles.actionBullet}>
+                <Text style={aiStyles.actionBulletText}>{i + 1}</Text>
+              </View>
+              <Text style={aiStyles.actionText}>{action}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Action today CTA */}
+      {data.action_today && (
+        <View style={aiStyles.ctaBanner}>
+          <Text style={aiStyles.ctaLabel}>📍 DO TODAY</Text>
+          <Text style={aiStyles.ctaText}>{data.action_today}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Safety nets ──────────────────────────────────────────────────────────────
 function SafetyNetsSection({ nets }: { nets: SafetyNet[] }) {
   if (!nets || nets.length === 0) return null;
   return (
@@ -128,6 +229,7 @@ function SafetyNetsSection({ nets }: { nets: SafetyNet[] }) {
   );
 }
 
+// ─── Survival actions ─────────────────────────────────────────────────────────
 function SurvivalActionsSection({ actions, comparison }: {
   actions: SurvivalAction[];
   comparison?: ShockData['survival_comparison'];
@@ -181,6 +283,7 @@ function SurvivalActionsSection({ actions, comparison }: {
   );
 }
 
+// ─── Main card ────────────────────────────────────────────────────────────────
 export default function ShockTimelineCard({ data }: Props) {
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const cardTranslate = useRef(new Animated.Value(16)).current;
@@ -235,12 +338,10 @@ export default function ShockTimelineCard({ data }: Props) {
         </Animated.View>
       </Animated.View>
 
-      {/* Scenario + summary row */}
+      {/* Scenario + depletion row */}
       <View style={styles.scenarioRow}>
         <View>
-          <Text style={styles.scenarioLabel}>
-            {SCENARIO_LABELS[scenario] ?? scenario}
-          </Text>
+          <Text style={styles.scenarioLabel}>{SCENARIO_LABELS[scenario] ?? scenario}</Text>
           {data.risk_probability && (
             <Text style={styles.riskProb}>{data.risk_probability}</Text>
           )}
@@ -248,9 +349,7 @@ export default function ShockTimelineCard({ data }: Props) {
         <View style={styles.depletion}>
           <Text style={styles.depletionLabel}>DEPLETES AT</Text>
           <Text style={[styles.depletionValue, { color: data.survives ? '#16A34A' : '#DC2626' }]}>
-            {data.depletes_at_month === null
-              ? 'Never'
-              : `Month ${data.depletes_at_month}`}
+            {data.depletes_at_month === null ? 'Never' : `Month ${data.depletes_at_month}`}
           </Text>
         </View>
       </View>
@@ -296,6 +395,9 @@ export default function ShockTimelineCard({ data }: Props) {
         </ScrollView>
       </View>
 
+      {/* AI Analysis (new structured section) */}
+      <AIAnalysisSection data={data} />
+
       {/* Safety nets */}
       {data.safety_nets && <SafetyNetsSection nets={data.safety_nets} />}
 
@@ -307,7 +409,7 @@ export default function ShockTimelineCard({ data }: Props) {
         />
       )}
 
-      {/* Insurance gap */}
+      {/* Insurance gap note */}
       {data.insurance_gap_note && (
         <View style={styles.insuranceGap}>
           <Text style={styles.insuranceGapText}>💡 {data.insurance_gap_note}</Text>
@@ -326,6 +428,181 @@ export default function ShockTimelineCard({ data }: Props) {
   );
 }
 
+// ─── AI Analysis styles ───────────────────────────────────────────────────────
+const aiStyles = StyleSheet.create({
+  section: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.08)',
+    paddingTop: 14,
+    marginBottom: 12,
+    gap: 10,
+  },
+  heading: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  // Job loss survival banner
+  survivalBanner: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    gap: 2,
+  },
+  survivalLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 1.5,
+  },
+  survivalMonths: {
+    fontSize: 28,
+    fontWeight: '900',
+    lineHeight: 32,
+  },
+  survivalSub: {
+    fontSize: 11,
+    color: '#6B7280',
+  },
+  // Blocks
+  block: {
+    gap: 6,
+  },
+  blockLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  // Risk rows
+  riskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  riskLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  riskName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#11181C',
+  },
+  riskNote: {
+    fontSize: 10,
+    color: '#9CA3AF',
+    marginTop: 1,
+  },
+  riskCostBadge: {
+    backgroundColor: 'rgba(220,38,38,0.08)',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  riskCost: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  // Verdict box
+  verdictBox: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  verdictTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  verdictLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#9CA3AF',
+    letterSpacing: 1.5,
+  },
+  verdictAmount: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  withstandBadge: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  withstandText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  verdictSummary: {
+    fontSize: 11,
+    color: '#374151',
+    lineHeight: 16,
+  },
+  // Key actions
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  actionBullet: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(37,99,235,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  actionBulletText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  actionText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#11181C',
+    lineHeight: 17,
+  },
+  // CTA banner
+  ctaBanner: {
+    backgroundColor: 'rgba(37,99,235,0.07)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563EB',
+    borderRadius: 8,
+    padding: 10,
+    gap: 3,
+  },
+  ctaLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#2563EB',
+    letterSpacing: 1.5,
+  },
+  ctaText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#11181C',
+    lineHeight: 17,
+  },
+});
+
+// ─── Existing styles ──────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
@@ -380,7 +657,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   scenarioLabel: {
     fontSize: 15,
@@ -516,7 +793,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontVariant: ['tabular-nums'],
   },
-  // ─── Section shared ────────────────────────────────────────────────────
   section: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.08)',
@@ -530,7 +806,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 8,
   },
-  // ─── Safety nets ───────────────────────────────────────────────────────
   netRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -540,26 +815,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 8,
   },
-  netInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  netName: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#11181C',
-  },
-  netNote: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  netAmount: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#2563EB',
-  },
-  // ─── Survival actions ──────────────────────────────────────────────────
+  netInfo: { flex: 1, marginRight: 8 },
+  netName: { fontSize: 11, fontWeight: '600', color: '#11181C' },
+  netNote: { fontSize: 10, color: '#6B7280', marginTop: 2 },
+  netAmount: { fontSize: 13, fontWeight: '700', color: '#2563EB' },
   comparisonBanner: {
     backgroundColor: 'rgba(22,163,74,0.08)',
     borderRadius: 8,
@@ -568,14 +827,8 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: '#16A34A',
   },
-  comparisonText: {
-    fontSize: 11,
-    color: '#374151',
-  },
-  comparisonGain: {
-    fontWeight: '700',
-    color: '#16A34A',
-  },
+  comparisonText: { fontSize: 11, color: '#374151' },
+  comparisonGain: { fontWeight: '700', color: '#16A34A' },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -588,60 +841,20 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     marginTop: 1,
   },
-  actionTypeText: {
-    fontSize: 8,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  actionInfo: {
-    flex: 1,
-  },
-  actionTitle: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#11181C',
-  },
-  actionDesc: {
-    fontSize: 10,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  actionImpact: {
-    alignItems: 'flex-end',
-  },
-  actionImpactRm: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#16A34A',
-  },
-  actionImpactLabel: {
-    fontSize: 9,
-    color: '#6B7280',
-    marginTop: 1,
-  },
+  actionTypeText: { fontSize: 8, fontWeight: '700', letterSpacing: 0.5 },
+  actionInfo: { flex: 1 },
+  actionTitle: { fontSize: 11, fontWeight: '600', color: '#11181C' },
+  actionDesc: { fontSize: 10, color: '#6B7280', marginTop: 2 },
+  actionImpact: { alignItems: 'flex-end' },
+  actionImpactRm: { fontSize: 11, fontWeight: '700', color: '#16A34A' },
+  actionImpactLabel: { fontSize: 9, color: '#6B7280', marginTop: 1 },
   prepLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#9CA3AF',
-    letterSpacing: 1,
-    marginTop: 8,
-    marginBottom: 4,
+    fontSize: 9, fontWeight: '700', color: '#9CA3AF',
+    letterSpacing: 1, marginTop: 8, marginBottom: 4,
   },
-  prepRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 4,
-  },
-  prepBullet: {
-    color: '#9CA3AF',
-    fontSize: 11,
-  },
-  prepText: {
-    fontSize: 10,
-    color: '#374151',
-    flex: 1,
-  },
-  // ─── Insurance gap ────────────────────────────────────────────────────
+  prepRow: { flexDirection: 'row', gap: 6, marginBottom: 4 },
+  prepBullet: { color: '#9CA3AF', fontSize: 11 },
+  prepText: { fontSize: 10, color: '#374151', flex: 1 },
   insuranceGap: {
     backgroundColor: 'rgba(217,119,6,0.07)',
     borderRadius: 8,
@@ -650,11 +863,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 2,
     borderLeftColor: 'rgba(217,119,6,0.35)',
   },
-  insuranceGapText: {
-    fontSize: 11,
-    color: '#374151',
-    lineHeight: 16,
-  },
+  insuranceGapText: { fontSize: 11, color: '#374151', lineHeight: 16 },
   footer: {
     backgroundColor: 'rgba(0,0,0,0.04)',
     borderRadius: 10,
