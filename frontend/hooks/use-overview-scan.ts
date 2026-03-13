@@ -28,29 +28,19 @@ import type { AlertData, PlanData, ScoreData, VitalsData } from './use-resilienc
 // Config
 // ---------------------------------------------------------------------------
 const OVERVIEW_URL  = `${API_BASE_URL}/api/v1/resilience/overview/demo`;
-const CACHE_KEY     = 'finsight_overview_cache_v2';
+const CACHE_KEY     = 'finsight_overview_cache_v1';
 const CACHE_TTL_MS  = 24 * 60 * 60 * 1000; // 24 hours
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-export type AnalysisData = {
-  card: 'analysis';
-  overall_standing:  string[];
-  emergency_buffer:  string[];
-  debt_load:         string[];
-  monthly_cash_flow: string[];
-  spending_habits:   string[];
-  priority_action:   string[];
-};
-
 export type OverviewCacheEntry = {
   timestamp: number;
-  vitals:    VitalsData    | null;
-  score:     ScoreData     | null;
-  alert:     AlertData     | null;
-  plan:      PlanData      | null;
-  analysis:  AnalysisData  | null;
+  vitals:    VitalsData | null;
+  score:     ScoreData  | null;
+  alert:     AlertData  | null;
+  plan:      PlanData   | null;
+  analysis:  string;
 };
 
 export type OverviewState = OverviewCacheEntry & {
@@ -65,7 +55,7 @@ const INITIAL_STATE: OverviewState = {
   score:       null,
   alert:       null,
   plan:        null,
-  analysis:    null,
+  analysis:    '',
   isLoading:   true,
   currentStep: '',
   error:       null,
@@ -149,7 +139,7 @@ export function useOverviewScan() {
       ...prev,
       isLoading:   true,
       currentStep: '',
-      analysis:    null,
+      analysis:    '',
       vitals:      null,
       score:       null,
       alert:       null,

@@ -71,7 +71,7 @@ _SHOCK_CONTEXT: dict[str, str] = {
 }
 
 
-def _build_prompt(simulation: dict, profile: dict, shock_type: str, regional_risks: list | None = None) -> str:
+def _build_prompt(simulation: dict, profile: dict, shock_type: str) -> str:
     projections  = simulation["monthly_projected"]
     trends       = simulation.get("spending_trends", {})
     top_cat      = simulation["top_category_affected"]
@@ -79,7 +79,6 @@ def _build_prompt(simulation: dict, profile: dict, shock_type: str, regional_ris
     one_time     = simulation["one_time_cost_estimate"]
     months_broke = simulation.get("months_until_broke")
     indicators   = profile.get("indicators", [])
-    regional_risks = regional_risks or []
 
     # Plain-English spending trend description (top 3 by magnitude)
     trend_lines = []
@@ -135,9 +134,6 @@ SHOCK PROJECTIONS — {shock_label.upper()} for {simulation['duration_months']} 
   Total financial impact: RM{total_impact:.0f}
   Emergency fund runway: {runway_text}
 
-REGIONAL RISK EVENTS (real recent events in Malaysia — reference where relevant):
-{chr(10).join(f'  - {r["event_title"]} (severity {r["severity"]}/5)' for r in regional_risks[:3]) if regional_risks else '  - No specific regional events on record'}
-
 {_MY_CONTEXT}
 
 {_SHOCK_CONTEXT.get(shock_type, '')}
@@ -164,7 +160,6 @@ async def generate_shock_narrative(
     simulation: dict,
     profile: dict,
     shock_type: str,
-    regional_risks: list | None = None,
 ) -> dict:
     """
     Generates a personalized narrative and action_today for the shock scenario.
@@ -185,7 +180,7 @@ async def generate_shock_narrative(
             "action_today": fallback_action,
         }
 
-    prompt = _build_prompt(simulation, profile, shock_type, regional_risks or [])
+    prompt = _build_prompt(simulation, profile, shock_type)
     genai.configure(api_key=settings.GEMINI_API_KEY)
     model = genai.GenerativeModel("models/gemini-2.5-flash-lite")
     loop = asyncio.get_running_loop()

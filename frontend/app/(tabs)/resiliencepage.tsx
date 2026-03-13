@@ -48,7 +48,6 @@ import {
   type StressTestData,
   type VitalsData,
 } from '@/hooks/use-resilience-stream';
-import ContingencyPage from "../contingencypage";
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
 const T = {
@@ -865,9 +864,14 @@ export default function ResiliencePage() {
 
       {/* ══ Scenarios Tab ══ */}
       {activeTab === 'scenarios' && (
-        <View style={{ flex: 1 }}>
-       <ContingencyPage />
-      </View>
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <ScenariosTab shock={shock} stressTest={stressTest} />
+          <View style={{ height: 24 }} />
+        </ScrollView>
       )}
 
       {/* ══ Chat Tab ══ */}

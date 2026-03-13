@@ -5,22 +5,20 @@ import * as SecureStore from "expo-secure-store";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-
 
 export default function SettingsPage() {
   const router = useRouter();
 
   const [user, setUser] = useState<any>(null);
   const [notifications, setNotifications] = useState(true);
-  const [readNotifications, setReadNotifications] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [notificationConsent, setNotificationConsent] =
     useState<string>("not-set");
 
@@ -28,18 +26,16 @@ export default function SettingsPage() {
     useCallback(() => {
       fetchUser();
       fetchConsentStatus();
-    }, [])
+    }, []),
   );
 
   const fetchUser = async () => {
     try {
       const data = await authService.me();
-
       if (!data) {
-        router.replace("/Login");
+        router.replace("/loginpage");
         return;
       }
-
       setUser(data);
     } catch (error) {
       console.log("Failed to load user:", error);
@@ -67,13 +63,11 @@ export default function SettingsPage() {
       <Text style={styles.sectionTitle}>Preferences</Text>
 
       <View style={styles.card}>
-        {/* Notifications Toggle */}
         <View style={styles.row}>
           <View style={styles.rowLeft}>
             <Ionicons name="notifications-outline" size={20} color="#1E3A8A" />
             <Text style={styles.rowText}>Notifications</Text>
           </View>
-
           <Switch
             value={notifications}
             onValueChange={setNotifications}
@@ -83,49 +77,45 @@ export default function SettingsPage() {
 
         <View style={styles.divider} />
 
-        {/* Read Notifications */}
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => router.push("/notification-consent")}
+        >
+          <View style={styles.rowLeft}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={20}
+              color="#1E3A8A"
+            />
+            <Text style={styles.rowText}>Notification Data Consent</Text>
+          </View>
+          <View style={styles.rowRight}>
+            <Text style={styles.statusText}>
+              {notificationConsent === "granted" ? "Granted" : "Not granted"}
+            </Text>
+            <Ionicons name="chevron-forward" size={18} color="#999" />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
         <View style={styles.row}>
           <View style={styles.rowLeft}>
-            <Ionicons name="alert" size={20} color="#1E3A8A" />
-            <Text style={styles.rowText}>Read Notifications</Text>
-
-            <TouchableOpacity
-              onPress={() =>
-                Alert.alert(
-                  "Read Notifications",
-                  "FinSight will read transaction-related notifications from supported banks and e-wallets to automatically detect your expenses."
-                )
-              }
-            >
-              <Ionicons
-                name="information-circle-outline"
-                size={18}
-                color="#1E3A8A"
-                style={{ marginLeft: 6 }}
-              />
-            </TouchableOpacity>
+            <Ionicons name="moon-outline" size={20} color="#1E3A8A" />
+            <Text style={styles.rowText}>Dark Mode</Text>
           </View>
-
           <Switch
-            value={readNotifications}
-            onValueChange={(value) => {
-              if (value) {
-                router.push("/notification-consent")
-              } else {
-                setReadNotifications(false);
-              }
-            }}
+            value={darkMode}
+            onValueChange={setDarkMode}
             trackColor={{ true: "#1E3A8A" }}
           />
         </View>
-
       </View>
 
       {/* Account Section */}
       <Text style={styles.sectionTitle}>Account</Text>
 
       <View style={styles.card}>
-        {/* Edit Profile */}
         <TouchableOpacity
           style={styles.row}
           onPress={() => router.push("/editProfile")}
@@ -140,22 +130,16 @@ export default function SettingsPage() {
 
         <View style={styles.divider} />
 
-        {/* Change Password */}
-        <TouchableOpacity
-          style={styles.row}
-          onPress={() => router.push("/changepassword")}
-        >
+        <TouchableOpacity style={styles.row}>
           <View style={styles.rowLeft}>
             <Ionicons name="lock-closed-outline" size={20} color="#1E3A8A" />
             <Text style={styles.rowText}>Change Password</Text>
           </View>
-
           <Ionicons name="chevron-forward" size={18} color="#999" />
         </TouchableOpacity>
 
         <View style={styles.divider} />
 
-        {/* Log Out */}
         <TouchableOpacity style={styles.row}>
           <View style={styles.rowLeft}>
             <Ionicons name="log-out-outline" size={20} color="#E4572E" />
@@ -232,15 +216,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
+  rowText: {
+    fontSize: 16,
+    marginLeft: 10,
+  },
+
   rowRight: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-
-  rowText: {
-    fontSize: 16,
-    marginLeft: 10,
   },
 
   statusText: {

@@ -46,6 +46,16 @@ export default function TabLayout() {
       }}
       />      
 
+<Tabs.Screen
+  name="contingencypage"
+  options={{
+    title: "Contingency",
+    tabBarIcon: ({ color, size }) => (
+      <Ionicons name="alert-circle-outline" size={size} color={color} />
+    ),
+  }}
+/>
+
  <Tabs.Screen
   name="settingspage"
   options={{

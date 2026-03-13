@@ -267,7 +267,7 @@ async def get_shock_simulation(
     )
 
     # ── 5. Gemini narrative with full Malaysian context ────────────────────────
-    narrative = await generate_shock_narrative(simulation, profile, shock_type, regional_risks)
+    narrative = await generate_shock_narrative(simulation, profile, shock_type)
 
     return {
         **simulation,

@@ -1,11 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import api from "../services/api";
-
-const { width: SCREEN_W } = Dimensions.get("window");
-// container paddingHorizontal:20 each side (40) + cardInner padding:16 each side (32) = 72
-const INCIDENT_CARD_W = SCREEN_W - 72;
+import { ActivityIndicator, Alert, Animated, Dimensions, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import api from "../../services/api";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Indicator {
@@ -68,158 +64,6 @@ const TAB_RELEVANT: Record<string, string[]> = {
   D: ["near_zero_surplus", "high_fixed_costs", "irregular_income"],
 };
 
-const TAB_SCENARIO_TITLE = {
-  A: "Financial Simulation with Recent Illness",
-  B: "Financial Simulation with Job Market Risk",
-  C: "Financial Simulation with Natural Disaster",
-  D: "Financial Simulation with Geopolitical Conflict",
-};
-
-type PreparationRange = {
-  label: string
-  min: number
-  max: number
-}
-
-type PreparationItem = {
-  label: string
-  value: string
-  isTotal?: boolean
-}
-
-function getPreparationItems(shock:any): PreparationItem[] {
-
-const monthly = shock.baseline_monthly_expense;
-const duration = shock.duration_months;
-const oneTime = shock.one_time_cost_estimate || 0;
-
-let rows: PreparationRange[] = [];
-
-switch(shock.shock_type){
-
-case "illness":
-
-rows = [
-{
-label:"Hospital treatment",
-min: oneTime * 0.8,
-max: oneTime * 1.5
-},
-{
-label:"Medication & recovery",
-min: monthly * 0.3,
-max: monthly * 0.9
-},
-{
-label:"Income disruption",
-min: monthly * duration,
-max: monthly * duration * 2
-}
-];
-
-break;
-
-
-case "job_loss":
-
-rows = [
-{
-label:"Living expenses",
-min: monthly * duration,
-max: monthly * duration * 1.5
-},
-{
-label:"Job search costs",
-min: monthly * 0.05,
-max: monthly * 0.15
-},
-{
-label:"Skill upgrade",
-min: monthly * 0.3,
-max: monthly * 0.8
-}
-];
-
-break;
-
-
-case "disaster":
-
-rows = [
-{
-label:"Home repair",
-min: oneTime * 0.8,
-max: oneTime * 1.6
-},
-{
-label:"Temporary relocation",
-min: monthly * 0.5,
-max: monthly
-},
-{
-label:"Emergency supplies",
-min: monthly * 0.1,
-max: monthly * 0.3
-}
-];
-
-break;
-
-
-case "war":
-
-rows = [
-{
-label:"Food supply buffer",
-min: monthly * 0.5,
-max: monthly
-},
-{
-label:"Fuel & transport",
-min: monthly * 0.3,
-max: monthly * 0.6
-},
-{
-label:"Inflation buffer",
-min: monthly * duration,
-max: monthly * duration * 1.8
-}
-];
-
-break;
-}
-
-
-// ── Calculate total range ──
-
-const totalMin = rows.reduce((sum,r)=>sum+r.min,0);
-const totalMax = rows.reduce((sum,r)=>sum+r.max,0);
-
-
-// ── Format rows ──
-
-const round100Down = (n: number) => Math.floor(n / 100) * 100;
-const round100Up   = (n: number) => Math.ceil(n  / 100) * 100;
-const fmtRange = (min: number, max: number) =>
-  `RM ${round100Down(min).toLocaleString()} – RM ${round100Up(max).toLocaleString()}`;
-
-const formatted: PreparationItem[] = rows.map(r=>({
-label:r.label,
-value: fmtRange(r.min, r.max)
-}));
-
-
-// ── Add TOTAL row ──
-
-formatted.push({
-  label:"Total estimated",
-  value: fmtRange(totalMin, totalMax),
-  isTotal:true
-})
-
-return formatted;
-}
-
 const INDICATOR_LABEL: Record<string, string> = {
   health_exposure_high: "High health spending",
   single_income_source: "Single income source",
@@ -241,7 +85,7 @@ export default function ContingencyPage() {
   const [containerWidth, setContainerWidth] = useState(0);
   const [savingInput, setSavingInput] = useState("");
   const [saving, setSaving] = useState(false);
-
+  const indicatorPosition = useState(new Animated.Value(0))[0];
   const [selectedTab, setSelectedTab] = useState<"A" | "B" | "C" | "D">("A");
 
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -356,14 +200,15 @@ export default function ContingencyPage() {
     }
 
     // ── Full shock simulation card ──────────────────────────────────────────
+    // months_until_broke: how long the fund lasts; cap at duration for display
     const fundMonths = Math.min(shock.months_until_broke ?? shock.duration_months, shock.duration_months);
     const coveragePct = Math.min((fundMonths / shock.duration_months) * 100, 100);
     const coverageColor = coveragePct >= 80 ? "#10B981" : coveragePct >= 40 ? "#F59E0B" : "#EF4444";
-    const prepItems = getPreparationItems(shock);
+
     return (
       <View style={styles.cardInner}>
 
-        {/* 1 ── Severity badge */}
+        {/* Severity badge */}
         <View style={styles.severityRow}>
           <View style={[styles.severityBadge, {
             backgroundColor: shock.severity_label === "critical" ? "#FEE2E2" : shock.severity_label === "severe" ? "#FEE2E2" : "#FEF3C7",
@@ -376,7 +221,7 @@ export default function ContingencyPage() {
           </View>
         </View>
 
-        {/* 2 ── Fund coverage bar */}
+        {/* Fund coverage bar */}
         <Text style={styles.coverageLabel}>Fund coverage for this scenario</Text>
         <View style={styles.coverageBar}>
           <View style={[styles.coverageFill, {
@@ -391,103 +236,44 @@ export default function ContingencyPage() {
             : "  ·  fund fully covers this shock"}
         </Text>
 
-        {/* 3 ── Incident cards (regional_risks) — moved above table */}
-        {(shock.regional_risks ?? []).length > 0 && (
-          <View style={styles.simulationSection}>
-            <Text style={styles.simulationTitle}>{TAB_SCENARIO_TITLE[selectedTab]}</Text>
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-            >
-              {(shock.regional_risks ?? []).slice(0, 5).map((risk, i) => (
-                <View key={i} style={styles.simulationCard}>
-                  <View style={styles.simTopRow}>
-                    <View style={styles.simLeft}>
-                      <Text style={styles.simDisease}>{risk.event_title}</Text>
-                      <Text style={styles.simLocation}>ASEAN Region</Text>
-                      {risk.source_url && (
-                        <Text
-                          style={styles.simSource}
-                          onPress={() => Linking.openURL(risk.source_url)}
-                        >
-                          {new URL(risk.source_url).hostname.replace("www.", "")}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.simDivider} />
-                    <View style={styles.simRight}>
-                      <Text style={styles.simSurvive}>Survive</Text>
-                      <Text style={styles.simMonths}>
-                        {shock.months_until_broke ?? shock.duration_months} Months
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
+        {/* Shortfall chip */}
+        {shock.grand_total_impact > 0 && (
+          <View style={styles.shortfallChip}>
+            <Ionicons name="warning-outline" size={14} color="#DC2626" />
+            <Text style={styles.shortfallChipText}>
+              RM{fmt(shock.grand_total_impact)} total impact over {shock.duration_months} months
+              {shock.one_time_cost_estimate > 0 ? `  (incl. RM${fmt(shock.one_time_cost_estimate)} one-off)` : ""}
+            </Text>
           </View>
         )}
 
-        {/* 5 ── What you need to prepare */}
-        <View style={styles.prepareCard}>
-          <Text style={styles.prepareTitle}>💰 WHAT YOU NEED TO PREPARE</Text>
-          {prepItems.map((item, index) => (
-            <View
-              key={index}
-              style={[
-                styles.prepareRow,
-                item.isTotal && { borderTopWidth: 1, borderTopColor: "#D1D5DB", borderBottomWidth: 0, marginTop: 6, paddingTop: 12 },
-              ]}
-            >
-              <Text style={[styles.prepareLabel, item.isTotal && { fontWeight: "700", color: "#111827" }]}>
-                {item.label}
-              </Text>
-              <Text style={[styles.prepareValue, item.isTotal && { color: "#DC2626", fontSize: 15 }]}>
-                {item.value}
-              </Text>
-            </View>
-          ))}
+        {/* Monthly mini-table */}
+        <View style={styles.tableHeader}>
+          <Text style={styles.tableCell}>Mo.</Text>
+          <Text style={styles.tableCell}>Income</Text>
+          <Text style={styles.tableCell}>Expenses</Text>
+          <Text style={[styles.tableCell, { color: "#1E3A8A" }]}>Net</Text>
         </View>
+        {(shock.monthly_projected ?? []).map((m) => (
+          <View key={m.month} style={[styles.tableRow, m.deficit < 0 && styles.tableRowRed]}>
+            <Text style={styles.tableCell}>{m.month}</Text>
+            <Text style={styles.tableCell}>RM{fmt(m.income)}</Text>
+            <Text style={styles.tableCell}>RM{fmt(m.expense)}</Text>
+            <Text style={[styles.tableCell, { color: m.deficit < 0 ? "#EF4444" : "#10B981", fontWeight: "600" }]}>
+              {m.deficit < 0 ? "−" : "+"}RM{fmt(Math.abs(m.deficit))}
+            </Text>
+          </View>
+        ))}
 
-        {/* 6 ── Monthly projection — one card per month, no squishing */}
-        <View style={styles.analysisCard}>
-          <Text style={styles.analysisCardTitle}>Monthly Projection</Text>
-          {(shock.monthly_projected ?? []).map((m) => {
-            const analysis =
-              m.month === 1 ? "Initial financial shock"
-              : m.month === 2 ? "Savings buffer shrinking"
-              : m.month === shock.duration_months ? "Pressure peaks here"
-              : "Ongoing financial strain";
-            const isShortfall = m.deficit < 0;
-            return (
-              <View key={m.month} style={styles.monthCard}>
-                <View style={styles.monthCardHeader}>
-                  <Text style={styles.monthCardMonth}>Month {m.month}</Text>
-                  <Text style={styles.monthCardAnalysis}>{analysis}</Text>
-                </View>
-                <View style={styles.monthMoneyRow}>
-                  <View style={styles.monthMoneyCol}>
-                    <Text style={styles.monthMoneyLabel}>Income</Text>
-                    <Text style={styles.monthMoneyValue}>RM{fmt(m.income)}</Text>
-                  </View>
-                  <View style={[styles.monthMoneyCol, styles.monthMoneyColMid]}>
-                    <Text style={styles.monthMoneyLabel}>Expenses</Text>
-                    <Text style={styles.monthMoneyValue}>RM{fmt(m.expense)}</Text>
-                  </View>
-                  <View style={styles.monthMoneyCol}>
-                    <Text style={styles.monthMoneyLabel}>Net</Text>
-                    <Text style={[styles.monthMoneyValue, { color: isShortfall ? "#EF4444" : "#10B981" }]}>
-                      {isShortfall ? "−" : "+"}RM{fmt(Math.abs(m.deficit))}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-        </View>
+        {/* AI Narrative */}
+        {shock.narrative ? (
+          <View style={styles.narrativeBox}>
+            <Text style={styles.narrativeTitle}>📊 AI Analysis</Text>
+            <Text style={styles.narrativeText}>{shock.narrative}</Text>
+          </View>
+        ) : null}
 
-        {/* 7 ── Do this today */}
+        {/* Action callout */}
         {shock.action_today ? (
           <View style={styles.actionBox}>
             <Text style={styles.actionTitle}>✅ Do this today</Text>
@@ -495,6 +281,33 @@ export default function ContingencyPage() {
           </View>
         ) : null}
 
+        {/* Regional signals */}
+        {(shock.regional_risks ?? []).length > 0 && (
+          <View style={{ marginTop: 12 }}>
+            <Text style={styles.riskHeader}>📡 Regional signals</Text>
+            {shock.regional_risks.map((r, i) => (
+              <TouchableOpacity
+                key={i}
+                style={styles.riskRow}
+                onPress={() => r.source_url ? Linking.openURL(r.source_url) : undefined}
+                activeOpacity={r.source_url ? 0.65 : 1}
+              >
+                <View style={[styles.riskDot, {
+                  backgroundColor: r.severity >= 4 ? "#EF4444" : r.severity >= 2 ? "#F59E0B" : "#6B7280",
+                }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.riskLabel} numberOfLines={2}>{r.event_title}</Text>
+                  {r.source_url ? (
+                    <Text style={styles.riskUrl} numberOfLines={1}>{r.source_url}</Text>
+                  ) : null}
+                </View>
+                {r.source_url ? (
+                  <Ionicons name="open-outline" size={14} color="#6B7280" style={{ marginTop: 2 }} />
+                ) : null}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
     );
   }
@@ -546,33 +359,45 @@ export default function ContingencyPage() {
           style={styles.progressTabs}
           onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
         >
-          
-        {tabs.map((tab) => (
-  <TouchableOpacity
-    key={tab.key}
-    style={[
-      styles.tabButton,
-      selectedTab === tab.key && styles.tabButtonActive
-    ]}
-    onPress={() => {
-      setSelectedTab(tab.key);
-    }}
-  >
-    <Ionicons
-      name={tab.icon as any}
-      size={22}
-      color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
-    />
-    <Text
-      style={[
-        styles.tabLabel,
-        selectedTab === tab.key && { color: "#1E3A8A" }
-      ]}
-    >
-      {tab.label}
-    </Text>
-  </TouchableOpacity>
-))}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.indicator,
+              {
+                width: tabWidth * 0.5,
+                left: tabWidth * 0.25,
+                transform: [{ translateX: indicatorPosition }],
+              },
+            ]}
+          />
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={styles.tabButton}
+              onPress={() => {
+                setSelectedTab(tab.key);
+                const index = tabs.findIndex((t) => t.key === tab.key);
+                Animated.spring(indicatorPosition, {
+                  toValue: index * tabWidth,
+                  useNativeDriver: true,
+                }).start();
+              }}
+            >
+              <Ionicons
+                name={tab.icon as any}
+                size={22}
+                color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
+              />
+              <Text
+                style={[
+                  styles.tabLabel,
+                  selectedTab === tab.key && { color: "#1E3A8A" },
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -776,18 +601,17 @@ mainCard: {
 
   progressTabs: {
     position: "absolute",
-    alignContent: "center",
-    paddingBottom : 6,
-    top: -25,   // makes it float into card
-    left: 40,
-    right: 40,
+    top: -35,
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    left: 0,
+    right: 0,
     backgroundColor: "#1E3A8A",
-    padding: 4,
-    borderRadius: 25,
-    elevation: 6,
-    zIndex: 10,
+    borderRadius: 30,
+    paddingHorizontal: 15,
+    paddingVertical: 18,
+    elevation: 10,
+    overflow: "hidden",
   },
 
   tabBox: {
@@ -797,6 +621,13 @@ mainCard: {
     borderRadius: 12,
   },
 
+  tabButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    zIndex: 2,
+  },
 
   tabLabel: {
     fontSize: 11,
@@ -813,6 +644,7 @@ mainCard: {
 indicator: {
   position: "absolute",
   bottom: 6,
+  height: 1,
   backgroundColor: "#FFFFFF",
   borderRadius: 2,
 },
@@ -960,7 +792,6 @@ riskBadgeText: {
 
   // ── Shock simulation card styles ─────────────────────────────────────────
   severityRow: {
-    marginTop:15,
     marginBottom: 10,
   },
   severityBadge: {
@@ -993,7 +824,22 @@ riskBadgeText: {
     fontSize: 11,
     marginBottom: 10,
   },
-
+  shortfallChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FEE2E2",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  shortfallChipText: {
+    fontSize: 12,
+    color: "#DC2626",
+    fontWeight: "600",
+    flex: 1,
+  },
   tableHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1039,7 +885,7 @@ riskBadgeText: {
     backgroundColor: "#ECFDF5",
     borderRadius: 10,
     padding: 12,
-    marginTop: 2,
+    marginTop: 10,
     borderLeftWidth: 3,
     borderLeftColor: "#10B981",
   },
@@ -1054,311 +900,5 @@ riskBadgeText: {
     color: "#065F46",
     lineHeight: 17,
   },
-
-  tabButton: {
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-  paddingHorizontal: 10,
-  paddingVertical: 6,   // ← same padding for all tabs
-  borderRadius: 20,
-},
-
-tabButtonActive: {
-  backgroundColor: "#FFFFFF",
-},
-
-simulationRow:{
-flexDirection:"row",
-alignItems:"center",
-paddingVertical:12
-},
-
-simulationDivider:{
-  height:1,
-  backgroundColor:"#E5E7EB",
-  marginVertical:10
-},
-
-simulationSurviveText:{
-fontSize:12,
-color:"#6B7280"
-},
-
-simulationSurviveMonth:{
-fontSize:16,
-fontWeight:"700",
-color:"#111827"
-},
-
-tableMonth:{
-flex:0.6,
-fontSize:11,
-textAlign:"center"
-},
-
-tableMoney:{
-flex:1,
-fontSize:11,
-textAlign:"center"
-},
-
-tableAnalysis:{
-flex:2,
-fontSize:11,
-color:"#6B7280"
-},
-
-  analysisCard:{
-    backgroundColor:"#FFFFFF",
-    borderRadius:16,
-    padding:16,
-    marginTop:12,
-    marginBottom:18,
-    shadowColor:"#000",
-    shadowOpacity:0.05,
-    shadowRadius:8,
-    elevation:3
-  },
-
-  analysisCardTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#374151",
-    marginBottom: 12,
-    letterSpacing: 0.3,
-  },
-
-  monthCard: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-  },
-
-  monthCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-
-  monthCardMonth: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1E3A8A",
-  },
-
-  monthCardAnalysis: {
-    fontSize: 11,
-    color: "#6B7280",
-    flexShrink: 1,
-    textAlign: "right",
-    marginLeft: 8,
-  },
-
-  monthMoneyRow: {
-    flexDirection: "row",
-  },
-
-  monthMoneyCol: {
-    flex: 1,
-    alignItems: "flex-start",
-  },
-
-  monthMoneyColMid: {
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: "#E5E7EB",
-    paddingHorizontal: 8,
-    marginHorizontal: 4,
-  },
-
-  monthMoneyLabel: {
-    fontSize: 10,
-    color: "#9CA3AF",
-    marginBottom: 2,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-
-  monthMoneyValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#111827",
-  },
-
-simulationEvent:{
-  fontSize:16,
-  fontWeight:"600",
-  lineHeight:22,
-  marginBottom:6
-},
-
-simulationUrl:{
-  fontSize:12,
-  color:"#3B82F6",
-  marginBottom:10
-},
-
-simulationSurvive:{
-  alignItems:"center"
-},
-
-simviveLabel:{
-  fontSize:13,
-  color:"#6B7280"
-},
-
-simulationMonths:{
-  fontSize:22,
-  fontWeight:"700",
-  color:"#1E3A8A"
-},
-
-/* ───────── Simulation Section ───────── */
-
-simulationSection:{
-  marginTop:26
-},
-
-simulationTitle:{
-  fontSize:18,
-  fontWeight:"700",
-  marginBottom:16,
-  color:"#111827"
-},
-
-/* ───────── Swipe Card ───────── */
-
-simulationCard:{
-  width: INCIDENT_CARD_W,
-  backgroundColor:"#ebf0f7",
-  borderRadius:20,
-  padding:20,
-
-  shadowColor:"#000",
-  shadowOpacity:0.05,
-  shadowRadius:12,
-  elevation:4
-},
-
-/* ───────── Top Row Layout ───────── */
-
-simTopRow:{
-  flexDirection:"row",
-  alignItems:"center",
-  marginBottom:16
-},
-
-simLeft:{
-  flex:1
-},
-
-simRight:{
-  width:110,
-  alignItems:"center"
-},
-
-simDivider:{
-  width:1,
-  height:60,
-  backgroundColor:"#E5E7EB",
-  marginHorizontal:16
-},
-
-/* ───────── Left Column Text ───────── */
-
-simDisease:{
-  fontSize:18,
-  fontWeight:"600",
-  color:"#111827",
-  marginBottom:4
-},
-
-simLocation:{
-  fontSize:14,
-  color:"#6B7280"
-},
-
-simSource:{
-  fontSize:12,
-  color:"#2563EB",
-  marginTop:4
-},
-
-/* ───────── Right Column (Survival) ───────── */
-
-simSurvive:{
-  fontSize:13,
-  color:"#6B7280"
-},
-
-simMonths:{
-  fontSize:24,
-  fontWeight:"700",
-  color:"#1E3A8A",
-  marginTop:2
-},
-
-/* ───────── Preparation Table ───────── */
-
-prepareCard:{
-  marginTop:10,
-  backgroundColor:"#F9FAFB",
-  borderRadius:14,
-  padding:14
-},
-
-prepareTitle:{
-  fontSize:12,
-  fontWeight:"700",
-  color:"#6B7280",
-  marginBottom:10,
-  letterSpacing:0.5
-},
-
-prepareRow:{
-    flexDirection:"row",
-    justifyContent:"space-between",
-    alignItems:"flex-start",
-    paddingVertical:10,
-    borderBottomWidth:1,
-    borderBottomColor:"#E5E7EB"
-  },
-
-  prepareLabel:{
-    fontSize:13,
-    color:"#374151",
-    flex:1,
-    paddingRight: 8,
-  },
-
-  prepareValue:{
-    fontSize:13,
-    fontWeight:"600",
-    color:"#111827",
-    textAlign:"right",
-    flexShrink:1,
-    maxWidth:"58%",
-  },
-
-prepareTotal:{
-  flexDirection:"row",
-  justifyContent:"space-between",
-  marginTop:12
-},
-
-prepareTotalLabel:{
-  fontSize:15,
-  fontWeight:"700",
-  color:"#111827"
-},
-
-prepareTotalValue:{
-  fontSize:15,
-  fontWeight:"700",
-  color:"#DC2626"
-},
 
 });

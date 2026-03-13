@@ -10,10 +10,9 @@ async def categorize_receipt(text: str) -> dict:
     prompt = f"""You are a financial receipt analyzer.
 
 Extract from the receipt text:
-- transaction type: "income" if money was received, "expense" if money was spent
-- if transaction type is expense categorized based on category (one of: Food & Dining, Entertainment, Transport, Shopping, Health, Utilities, BNPL(Buy Now Pay Later), Groceries,Others)
-- if transaction type is income , categorize as (one of : Salary,Freelance or Other)
+- category (one of: Food, Entertainment, Transport, Shopping, Health, Utilities, Others)
 - total amount (a number, e.g. 18.50)
+- transaction type: "income" if money was received, "expense" if money was spent
 
 Rules for finding the total:
 - Prefer the final payment amount.

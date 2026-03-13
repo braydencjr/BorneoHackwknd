@@ -1,42 +1,50 @@
 """
-OverviewAgentService — stateless daily financial health scan.
+OverviewAgentService — stateless single-shot daily financial health scan.
 
-Architecture: direct tool invocations (no LangGraph agent loop).
-This is intentional — the LLM-driven agent is unreliable for a fixed
-diagnostic sequence because the LLM may choose not to call tools.
-Instead we call each tool directly in order:
-  1. display_vitals
-  2. show_resilience_score
-  3. trigger_emergency_alert  (only when score < 40)
-  4. show_savings_plan
-  5. show_analysis (LLM-authored bullet insights)
+Key differences from resilience_agent.py:
+  • No MemorySaver checkpointer — every invocation starts fresh, no thread history.
+  • Only 4 tools: display_vitals, show_resilience_score, trigger_emergency_alert,
+    show_savings_plan. No subagents, no HITL, no educator.
+  • Dedicated system prompt that instructs the agent to write per-metric explanations.
+  • Singleton agent instance (compiled graph reuse) — safe because there is no shared
+    mutable state without a checkpointer.
 """
 import json
 import logging
 import os
 from typing import AsyncGenerator
 
+from deepagents import create_deep_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.tools.financial_tools import (
     display_vitals,
     show_resilience_score,
     trigger_emergency_alert,
     show_savings_plan,
+    show_analysis,
 )
-from app.tools.data_source import FinancialDataSource
+from app.agents.prompts.finsight_overview import FINSIGHT_OVERVIEW_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
-_ds = FinancialDataSource()
+# ---------------------------------------------------------------------------
+# Tool → card-type mapping (subset of the main agent's map)
+# ---------------------------------------------------------------------------
+_TOOL_CARD_MAP = {
+    "display_vitals":          "vitals",
+    "show_resilience_score":   "score",
+    "trigger_emergency_alert": "alert",
+    "show_savings_plan":       "plan",
+    "show_analysis":           "analysis",
+}
 
-_STEP_LABELS = {
+_TOOL_STEP_LABELS = {
     "display_vitals":          "Reading vital signs…",
     "show_resilience_score":   "Calculating resilience score…",
     "trigger_emergency_alert": "Checking emergency signals…",
     "show_savings_plan":       "Building savings plan…",
-    "show_analysis":           "Writing AI insights…",
+    "show_analysis":           "Writing insights…",
 }
 
 
@@ -48,36 +56,48 @@ def _sse(payload: dict) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
 
-def _get_llm() -> ChatGoogleGenerativeAI:
-    api_key    = os.environ.get("GEMINI_API_KEY", "")
-    model_name = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
-    if not api_key:
-        try:
-            from app.core.config import get_settings
-            s = get_settings()
-            api_key    = s.GEMINI_API_KEY
-            model_name = s.GEMINI_MODEL or model_name
-        except Exception:
-            pass
+def _build_model(api_key: str, model_name: str) -> ChatGoogleGenerativeAI:
     if ":" in model_name:
         model_name = model_name.split(":", 1)[1]
     return ChatGoogleGenerativeAI(
         model=model_name,
         google_api_key=api_key,
-        temperature=0.15,
+        temperature=0.1,  # lower than chat — we want predictable structured output
+        convert_system_message_to_human=False,
     )
 
 
-async def _invoke_tool(tool_fn, args: dict) -> dict | None:
-    """Invoke a LangChain tool and return the parsed JSON dict, or None on failure."""
-    try:
-        raw = await tool_fn.ainvoke(args)
-        if hasattr(raw, "content"):
-            raw = raw.content
-        return json.loads(raw) if isinstance(raw, str) else raw
-    except Exception:
-        logger.exception("Tool %s failed", tool_fn.name)
-        return None
+# ---------------------------------------------------------------------------
+# Singleton agent — compiled once, reused for all requests.
+# No checkpointer → each astream_events call is fully independent.
+# ---------------------------------------------------------------------------
+_overview_agent = None
+
+
+def _get_overview_agent():
+    global _overview_agent
+    if _overview_agent is None:
+        from app.core.config import Settings
+        settings = Settings()
+        api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+        model_name = settings.GEMINI_MODEL or "gemini-2.5-flash"
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY is not set. Add it to your .env file.")
+        model = _build_model(api_key, model_name)
+        _overview_agent = create_deep_agent(
+            model=model,
+            tools=[
+                display_vitals,
+                show_resilience_score,
+                trigger_emergency_alert,
+                show_savings_plan,
+                show_analysis,
+            ],
+            system_prompt=FINSIGHT_OVERVIEW_SYSTEM_PROMPT,
+            # No checkpointer → stateless: each invoke is a fresh execution
+        )
+        logger.info("Overview agent initialised (stateless, no checkpointer).")
+    return _overview_agent
 
 
 # ---------------------------------------------------------------------------
@@ -86,123 +106,75 @@ async def _invoke_tool(tool_fn, args: dict) -> dict | None:
 
 async def stream_overview_response(user_id: str) -> AsyncGenerator[str, None]:
     """
-    Runs the financial health overview for `user_id` and yields SSE strings.
+    Runs the overview agent for `user_id` and yields SSE-formatted strings.
 
-    Events emitted:
-      {"type": "step",        "tool": "<name>", "label": "…"}
-      {"type": "tool_result", "tool": "<name>", "data": {…}}
-      {"type": "error",       "message": "…"}
+    Event shapes emitted (subset of the main agent's protocol):
+      {"type": "step",        "tool": "display_vitals", "label": "Reading vital signs…"}
+      {"type": "tool_call",   "tool": "display_vitals", "state": "running"}
+      {"type": "tool_call",   "tool": "display_vitals", "state": "done"}
+      {"type": "tool_result", "tool": "display_vitals", "data": {...}}
+      {"type": "text",        "content": "..."}
+      {"type": "error",       "message": "..."}
       {"type": "done"}
     """
+    agent = _get_overview_agent()
+
+    # Inject user_id the same way the main agent expects it
+    message = f"Run my financial health overview [user_id: {user_id}]"
+
+    # No thread_id in config → LangGraph creates ephemeral state per invocation
+    config = {"recursion_limit": 50}
+
     try:
-        # ── 1. Vitals ─────────────────────────────────────────────────────
-        yield _sse({"type": "step", "tool": "display_vitals",
-                    "label": _STEP_LABELS["display_vitals"]})
-        vitals_data = await _invoke_tool(display_vitals, {"user_id": user_id})
-        if vitals_data:
-            yield _sse({"type": "tool_result", "tool": "display_vitals", "data": vitals_data})
+        async for event in agent.astream_events(
+            {"messages": [{"role": "user", "content": message}]},
+            config=config,
+            version="v2",
+        ):
+            event_type = event.get("event", "")
+            name       = event.get("name", "")
+            meta       = event.get("metadata", {})
+            checkpoint_ns = meta.get("langgraph_checkpoint_ns", "")
 
-        # ── 2. Score ──────────────────────────────────────────────────────
-        yield _sse({"type": "step", "tool": "show_resilience_score",
-                    "label": _STEP_LABELS["show_resilience_score"]})
-        score_data = await _invoke_tool(show_resilience_score, {"user_id": user_id})
-        if score_data:
-            yield _sse({"type": "tool_result", "tool": "show_resilience_score", "data": score_data})
+            # ── Streaming text tokens from the main LLM node ──────────────
+            if event_type == "on_chat_model_stream":
+                if "tools:" not in checkpoint_ns:
+                    chunk = event["data"].get("chunk")
+                    if chunk and hasattr(chunk, "content") and chunk.content:
+                        content = chunk.content
+                        if isinstance(content, list):
+                            for block in content:
+                                if isinstance(block, dict) and block.get("type") == "text":
+                                    yield _sse({"type": "text", "content": block["text"]})
+                        elif isinstance(content, str) and content:
+                            yield _sse({"type": "text", "content": content})
 
-        # ── 3. Emergency alert (critical only) ────────────────────────────
-        score_val = score_data.get("score", 100) if score_data else 100
-        if score_val < 40:
-            yield _sse({"type": "step", "tool": "trigger_emergency_alert",
-                        "label": _STEP_LABELS["trigger_emergency_alert"]})
-            alert_data = await _invoke_tool(trigger_emergency_alert, {"user_id": user_id})
-            if alert_data:
-                yield _sse({"type": "tool_result", "tool": "trigger_emergency_alert", "data": alert_data})
+            # ── Tool about to run ─────────────────────────────────────────
+            elif event_type == "on_tool_start":
+                if name in _TOOL_CARD_MAP:
+                    yield _sse({
+                        "type": "step",
+                        "tool": name,
+                        "label": _TOOL_STEP_LABELS.get(name, f"Running {name}…"),
+                    })
+                    yield _sse({"type": "tool_call", "tool": name, "state": "running"})
 
-        # ── 4. Savings plan ───────────────────────────────────────────────
-        yield _sse({"type": "step", "tool": "show_savings_plan",
-                    "label": _STEP_LABELS["show_savings_plan"]})
-        plan_data = await _invoke_tool(show_savings_plan, {"user_id": user_id})
-        if plan_data:
-            yield _sse({"type": "tool_result", "tool": "show_savings_plan", "data": plan_data})
-
-        # ── 5. AI-authored analysis bullets ──────────────────────────────
-        yield _sse({"type": "step", "tool": "show_analysis",
-                    "label": _STEP_LABELS["show_analysis"]})
-        analysis_data = await _generate_analysis(user_id, vitals_data, score_data, plan_data)
-        if analysis_data:
-            yield _sse({"type": "tool_result", "tool": "show_analysis", "data": analysis_data})
+            # ── Tool finished ─────────────────────────────────────────────
+            elif event_type == "on_tool_end":
+                if name in _TOOL_CARD_MAP:
+                    raw_output = event["data"].get("output", "")
+                    if hasattr(raw_output, "content"):
+                        raw_output = raw_output.content
+                    if isinstance(raw_output, str):
+                        try:
+                            card_data = json.loads(raw_output)
+                            yield _sse({"type": "tool_call", "tool": name, "state": "done"})
+                            yield _sse({"type": "tool_result", "tool": name, "data": card_data})
+                        except json.JSONDecodeError:
+                            pass
 
     except Exception as exc:
-        logger.exception("Overview stream error for user %s", user_id)
+        logger.exception("Overview agent error for user %s", user_id)
         yield _sse({"type": "error", "message": str(exc)})
     finally:
         yield _sse({"type": "done"})
-
-
-async def _generate_analysis(
-    user_id: str,
-    vitals: dict | None,
-    score: dict | None,
-    plan: dict | None,
-) -> dict | None:
-    """
-    Calls the LLM directly to generate structured bullet insights.
-    Returns a dict matching the `show_analysis` tool schema, or None on failure.
-    """
-    try:
-        profile = await _ds.get_profile(user_id)
-
-        context = (
-            f"Monthly income: RM{profile.monthly_income:.0f}\n"
-            f"Fixed expenses: RM{profile.fixed_expenses:.0f}\n"
-            f"Flexible expenses: RM{profile.flexible_expenses:.0f}\n"
-            f"Monthly surplus: RM{profile.monthly_surplus:.0f}\n"
-            f"BNPL debt (90 days): RM{profile.bnpl_debt:.0f}\n"
-            f"Savings balance: RM{profile.savings_balance:.0f}\n"
-            f"Emergency fund: {profile.emergency_fund_months:.1f} months\n"
-            f"Resilience score: {score.get('score', '?') if score else '?'}/100 "
-            f"({score.get('tier', '') if score else ''})\n"
-        )
-
-        prompt = (
-            "You are a concise financial advisor. Given this user's financial data, "
-            "produce a JSON object ONLY (no markdown, no explanation) with exactly these keys, "
-            "each containing a list of exactly 2 short bullet strings (max 20 words each):\n"
-            "overall_standing, emergency_buffer, debt_load, monthly_cash_flow, "
-            "spending_habits, priority_action\n\n"
-            f"Financial data:\n{context}\n\n"
-            "Respond with valid JSON only."
-        )
-
-        llm = _get_llm()
-        response = await llm.ainvoke([
-            SystemMessage(content="You output only valid JSON. No markdown fences."),
-            HumanMessage(content=prompt),
-        ])
-
-        raw = response.content if hasattr(response, "content") else str(response)
-        # Strip markdown code fences if present
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        raw = raw.strip().rstrip("```").strip()
-
-        parsed = json.loads(raw)
-        parsed["card"] = "analysis"
-        return parsed
-
-    except Exception:
-        logger.exception("Analysis LLM call failed for user %s", user_id)
-        # Return a minimal fallback so the card still appears
-        return {
-            "card": "analysis",
-            "overall_standing": ["Review your spending to improve financial health.", "Focus on reducing BNPL usage first."],
-            "emergency_buffer": ["Build at least 3 months of expenses as a buffer.", "Set up an automatic savings transfer each month."],
-            "debt_load": ["Prioritise clearing BNPL debts quickly.", "Avoid new BNPL commitments until debts are cleared."],
-            "monthly_cash_flow": ["Track daily spending to stay within budget.", "Small cuts in flexible spending add up fast."],
-            "spending_habits": ["Review recurring subscriptions for savings.", "A spending diary helps identify waste."],
-            "priority_action": ["Open a dedicated emergency savings account today.", "Target 10% of income for automatic savings."],
-        }
-

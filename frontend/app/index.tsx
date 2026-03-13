@@ -17,7 +17,7 @@ export default function Landing() {
     }).start();
 
     const timer = setTimeout(() => {
-      router.replace("/Login");
+      router.replace("/loginpage");
     }, 3000);
 
     return () => clearTimeout(timer);
