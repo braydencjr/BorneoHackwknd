@@ -29,9 +29,6 @@ Receive personalised financial insights and educational micro-lessons generated 
 ### 📷 Receipt Scanning
 Capture receipts using the phone camera to automatically record expenses.
 
-### 🔔 Smart Notifications
-Get alerts and reminders for spending behaviour and financial insights.
-
 ### 🔐 Secure Authentication
 JWT-based authentication with optional **Google Sign-In** support.
 
