@@ -4,7 +4,14 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as SecureStore from "expo-secure-store";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Button, Modal, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Button,
+  Modal,
+  Text,
+  View,
+} from "react-native";
 
 export default function ScanPage() {
   const [permission, requestPermission] = useCameraPermissions();
@@ -45,12 +52,12 @@ export default function ScanPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           merchant_name: "Receipt",
           receipt_image: uri,
-          text: text
+          text: text,
         }),
       });
 
@@ -72,7 +79,6 @@ export default function ScanPage() {
       } catch (_) {
         // non-critical — ignore
       }
-
     } catch (err: any) {
       console.log("Backend processing failed", err);
       Alert.alert("Error", err.message || "Could not save receipt data.");
@@ -105,8 +111,10 @@ export default function ScanPage() {
               },
             ],
           }),
-        }
+        },
       );
+
+      if (!response.ok) throw new Error("Cloud Vision API failure");
 
       const data = await response.json();
       console.log("OCR Response:", data);
@@ -153,9 +161,9 @@ export default function ScanPage() {
           scanned
             ? undefined
             : ({ data }) => {
-              setScanned(true);
-              alert(`Scanned: ${data}`);
-            }
+                setScanned(true);
+                alert(`Scanned: ${data}`);
+              }
         }
       />
 
@@ -200,9 +208,7 @@ export default function ScanPage() {
               Receipt Summary
             </Text>
 
-            <Text style={{ marginTop: 10 }}>
-              Category: {category}
-            </Text>
+            <Text style={{ marginTop: 10 }}>Category: {category}</Text>
 
             <Text style={{ marginTop: 10, fontWeight: "bold" }}>
               Total: RM{Number(total || 0).toFixed(2)}
@@ -219,7 +225,14 @@ export default function ScanPage() {
                   borderLeftColor: "#1E3A8A",
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: "700", color: "#1E3A8A", marginBottom: 4 }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: "700",
+                    color: "#1E3A8A",
+                    marginBottom: 4,
+                  }}
+                >
                   💡 Emergency Fund Progress
                 </Text>
                 <View
@@ -240,11 +253,20 @@ export default function ScanPage() {
                   />
                 </View>
                 <Text style={{ fontSize: 11, color: "#374151" }}>
-                  RM{nudgePlan.current_progress.toFixed(2)} of RM{nudgePlan.target_amount.toFixed(2)}{" "}
-                  ({nudgePlan.progress_percentage.toFixed(0)}%)
+                  RM{nudgePlan.current_progress.toFixed(2)} of RM
+                  {nudgePlan.target_amount.toFixed(2)} (
+                  {nudgePlan.progress_percentage.toFixed(0)}%)
                 </Text>
-                <Text style={{ fontSize: 11, color: "#1E3A8A", marginTop: 4, fontWeight: "600" }}>
-                  Monthly saving target: RM{nudgePlan.monthly_savings_target.toFixed(2)}
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: "#1E3A8A",
+                    marginTop: 4,
+                    fontWeight: "600",
+                  }}
+                >
+                  Monthly saving target: RM
+                  {nudgePlan.monthly_savings_target.toFixed(2)}
                 </Text>
               </View>
             )}
