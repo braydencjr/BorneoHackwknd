@@ -194,6 +194,18 @@ docker run -p 8000:8000 --env-file .env finsight-api
 
 ---
 
+## 👥 Team Members
+
+| Name | Contribution |
+|------|-------------|
+| **Brayden Chong Jie Rui** | Built the AI-driven personalised financial suggestion system using **Google Gemini** and **DeepAgents**, analysing income and spending behaviour to generate practical, context-aware recommendations. |
+| **Cheng Kai Huang** | Developed the financial shock simulation module using **Google Gemini** and **DeepAgents**, modelling real-life events (illness, income loss, disasters) and generating tailored contingency fund recommendations. |
+| **Chin Yiu Ern** | Led mobile frontend development with **React Native (Expo)** and integrated camera-based receipt OCR scanning using **Expo Camera** for seamless expense capture. |
+| **Ng Zheng Jie** | Designed and implemented the financial resilience scoring system using **FastAPI**, **SQLAlchemy**, and a **DeepAgents**-powered analysis pipeline to evaluate savings, spending stability, and debt levels. |
+| **Ong Yean** | Built the automatic transaction capture pipeline (reading user-approved financial notifications) and the spending habit analysis feature using **FastAPI** and **Google Gemini** to identify spending patterns and flag risky financial behaviours. |
+
+---
+
 ## License
 
 MIT
