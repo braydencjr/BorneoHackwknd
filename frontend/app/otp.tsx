@@ -1,10 +1,26 @@
 import { BASE_URL } from "@/services/api";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+} from "react-native";
 
 export default function OTP() {
-  const { email = "", name = "", password = "" } = useLocalSearchParams<{
+  const {
+    email = "",
+    name = "",
+    password = "",
+  } = useLocalSearchParams<{
     email: string;
     name: string;
     password: string;
@@ -27,7 +43,12 @@ export default function OTP() {
       const res = await fetch(`${BASE_URL}/api/v1/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: lowerEmail, otp: otp.trim(), name: name.trim(), password }),
+        body: JSON.stringify({
+          email: lowerEmail,
+          otp: otp.trim(),
+          name: name.trim(),
+          password,
+        }),
       });
 
       let data: any = {};
@@ -38,17 +59,25 @@ export default function OTP() {
       }
 
       if (res.ok) {
-        Alert.alert("Account created!", "You can now log in with your credentials.", [
-          { text: "OK", onPress: () => router.replace("/loginpage") },
-        ]);
+        Alert.alert(
+          "Account created!",
+          "You can now log in with your credentials.",
+          [{ text: "OK", onPress: () => router.replace("/Login") }],
+        );
       } else {
         const errorMsg = data.detail ?? "The OTP is incorrect or has expired.";
-        const title = (res.status === 400 && data.detail === "Invalid OTP") ? "Invalid OTP" : "Registration Failed";
+        const title =
+          res.status === 400 && data.detail === "Invalid OTP"
+            ? "Invalid OTP"
+            : "Registration Failed";
         Alert.alert(title, errorMsg);
       }
     } catch (error: any) {
       console.error(error);
-      Alert.alert("Network error", "Could not reach the server. Please try again.");
+      Alert.alert(
+        "Network error",
+        "Could not reach the server. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -60,10 +89,14 @@ export default function OTP() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.title}>Verify Your Email</Text>
           <Text style={styles.subtitle}>
-            An OTP has been sent to{"\n"}<Text style={styles.email}>{email}</Text>
+            An OTP has been sent to{"\n"}
+            <Text style={styles.email}>{email}</Text>
           </Text>
 
           <TextInput
@@ -80,10 +113,11 @@ export default function OTP() {
             onPress={verifyOTP}
             disabled={loading}
           >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.buttonText}>Verify OTP</Text>
-            }
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Verify OTP</Text>
+            )}
           </TouchableOpacity>
         </ScrollView>
       </TouchableWithoutFeedback>
