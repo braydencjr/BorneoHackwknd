@@ -134,8 +134,8 @@ export default function Login() {
           />
 
           <TouchableOpacity onPress={() => router.push("/forgotpassword")}>
-  <Text style={styles.forgot}>Forgot Password?</Text>
-</TouchableOpacity>
+            <Text style={styles.forgot}>Forgot Password?</Text>
+          </TouchableOpacity>
 
           {/* Confirm Button */}
           <TouchableOpacity
@@ -156,23 +156,23 @@ export default function Login() {
           <Text style={styles.signInWith}>Sign in With :</Text>
 
           {isConfigured && (
-              <TouchableOpacity
-                  style={[
-                      styles.googleButton,
-                      (!request || loading) && { opacity: 0.6 },
-                  ]}
-                  disabled={!request || loading}
-                  onPress={() => promptAsync()}
-              >
-                  <AntDesign name="google" size={22} color="white" />
-                  <Text style={styles.googleText}>Sign in with Google</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.googleButton,
+                (!request || loading) && { opacity: 0.6 },
+              ]}
+              disabled={!request || loading}
+              onPress={() => promptAsync()}
+            >
+              <AntDesign name="google" size={22} color="white" />
+              <Text style={styles.googleText}>Sign in with Google</Text>
+            </TouchableOpacity>
           )}
 
           {/* Sign Up Button */}
           <TouchableOpacity
             style={styles.signUpButton}
-            onPress={() => router.push("/registrationpage")}
+            onPress={() => router.push("/Registration")}
           >
             <Text style={styles.signUpText}>Sign Up</Text>
           </TouchableOpacity>
