@@ -12,19 +12,19 @@ import DonutProgress from "../../components/donut_progress";
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 
-  function getHealthLabel(rate: number): string {
-    if (rate < 50) return "Excellent";
-    if (rate < 75) return "Good";
-    if (rate < 100) return "Moderate";
-    return "Critical";
-  }
+function getHealthLabel(rate: number): string {
+  if (rate < 50) return "Excellent";
+  if (rate < 75) return "Good";
+  if (rate < 100) return "Moderate";
+  return "Critical";
+}
 
-  function getHealthColor(rate: number): string {
-    if (rate < 50) return "#16A34A";
-    if (rate < 75) return "#D97706";
-    if (rate < 100) return "#F97316";
-    return "#DC2626";
-  }
+function getHealthColor(rate: number): string {
+  if (rate < 50) return "#16A34A";
+  if (rate < 75) return "#D97706";
+  if (rate < 100) return "#F97316";
+  return "#DC2626";
+}
 
 function ResilienceCard({
   scoreData,
@@ -62,15 +62,15 @@ function ResilienceCard({
     scoreData.tier === "strong"
       ? "#16A34A"
       : scoreData.tier === "moderate"
-      ? "#D97706"
-      : "#DC2626";
+        ? "#D97706"
+        : "#DC2626";
 
   const tierLabel =
     scoreData.tier === "strong"
       ? "RESILIENT"
       : scoreData.tier === "moderate"
-      ? "AT RISK"
-      : "CRITICAL";
+        ? "AT RISK"
+        : "CRITICAL";
 
   return (
     <View style={[styles.resilienceCard, { borderColor: tierColor + "40" }]}>
@@ -87,24 +87,24 @@ function ResilienceCard({
 
         {/* Right side */}
         <View style={styles.resilienceRight}>
-  <View
-    style={[
-      styles.resilienceTierBadge,
-      { backgroundColor: tierColor + "18", borderColor: tierColor + "44" }
-    ]}
-  >
-    <Text style={[styles.resilienceTierText, { color: tierColor }]}>
-      {tierLabel}
-    </Text>
-  </View>
+          <View
+            style={[
+              styles.resilienceTierBadge,
+              { backgroundColor: tierColor + "18", borderColor: tierColor + "44" }
+            ]}
+          >
+            <Text style={[styles.resilienceTierText, { color: tierColor }]}>
+              {tierLabel}
+            </Text>
+          </View>
 
-  {/* Verdict text */}
-  {scoreData.verdict && (
-    <Text style={styles.resilienceVerdict}>
-      {scoreData.verdict}
-    </Text>
-  )}
-</View>
+          {/* Verdict text */}
+          {scoreData.verdict && (
+            <Text style={styles.resilienceVerdict}>
+              {scoreData.verdict}
+            </Text>
+          )}
+        </View>
 
       </View>
     </View>
@@ -125,27 +125,27 @@ export default function HomePage() {
   } | null>(null);
 
   useFocusEffect(
-  useCallback(() => {
-    const fetchUser = async () => {
-      try {
-        const token = await SecureStore.getItemAsync("accessToken");
-        if (!token) return;
+    useCallback(() => {
+      const fetchUser = async () => {
+        try {
+          const token = await SecureStore.getItemAsync("accessToken");
+          if (!token) return;
 
-        const res = await fetch(`${BASE_URL}/api/v1/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+          const res = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
 
-        const data = await res.json();
-        console.log("Transactions API:", data);
-        console.log("INSIGHTS API:", data);
-        setTransactions(data.transactions ?? []);
+          const data = await res.json();
+          console.log("Transactions API:", data);
+          console.log("INSIGHTS API:", data);
+          setTransactions(data.transactions ?? []);
 
-        setUser(data);
+          setUser(data);
 
-      } catch (error) {
-        console.error("Failed to fetch user:", error);
-      }
-    };
+        } catch (error) {
+          console.error("Failed to fetch user:", error);
+        }
+      };
 
       const fetchFundPlan = async () => {
         try {
@@ -161,12 +161,12 @@ export default function HomePage() {
           console.error("Failed to fetch fund plan:", error);
         }
 
-    };
+      };
 
-    fetchUser();
-    fetchFundPlan();
-  }, [])
-);
+      fetchUser();
+      fetchFundPlan();
+    }, [])
+  );
 
   const router = useRouter();
 
@@ -205,7 +205,7 @@ export default function HomePage() {
     year: "numeric",
   });
 
-    const BNPL_KEYWORDS = [
+  const BNPL_KEYWORDS = [
     "bnpl",
     "installment",
     "spaylater",
@@ -227,7 +227,7 @@ export default function HomePage() {
   const healthColor = getHealthColor(spendRate);
   const savings = income - outcome;
 
-   const monthlySpending: Record<string, number> = transactions
+  const monthlySpending: Record<string, number> = transactions
     .filter((t) => t.type === "expense")
     .reduce(
       (acc, t) => {
@@ -241,35 +241,35 @@ export default function HomePage() {
       {} as Record<string, number>,
     );
 
-    const monthlyEntries = Object.entries(monthlySpending).slice(-4);
-    const maxMonthlySpend = Math.max(...monthlyEntries.map(([, v]) => v), 1);
+  const monthlyEntries = Object.entries(monthlySpending).slice(-4);
+  const maxMonthlySpend = Math.max(...monthlyEntries.map(([, v]) => v), 1);
 
   const months = [
-  "Jan","Feb","Mar",
-  "Apr","May","Jun",
-  "Jul","Aug","Sep",
-  "Oct","Nov","Dec"
+    "Jan", "Feb", "Mar",
+    "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep",
+    "Oct", "Nov", "Dec"
   ];
 
   const INCOME_CATEGORIES = [
-  "Salary",
-  "Freelance",
-  "Others"
-];
+    "Salary",
+    "Freelance",
+    "Others"
+  ];
 
   const OUTCOME_CATEGORIES = [
-  "Shopping",
-  "Food & Dining",
-  "Entertainment",
-  "Groceries",
-  "Utilities",
-  "Transport",
-  "BNPL",
-  "Health",
-  "Others"
-];
+    "Shopping",
+    "Food & Dining",
+    "Entertainment",
+    "Groceries",
+    "Utilities",
+    "Transport",
+    "BNPL",
+    "Health",
+    "Others"
+  ];
 
-function isFixed(category: string): boolean {
+  function isFixed(category: string): boolean {
     return OUTCOME_CATEGORIES.some((c) =>
       category?.toLowerCase().includes(c.toLowerCase()),
     );
@@ -282,30 +282,30 @@ function isFixed(category: string): boolean {
 
 
   const fetchInsights = async () => {
-  try {
-    const token = await SecureStore.getItemAsync("accessToken");
-    if (!token) return;
+    try {
+      const token = await SecureStore.getItemAsync("accessToken");
+      if (!token) return;
 
-    const res = await fetch(`${BASE_URL}/api/v1/summary/suggestions`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+      const res = await fetch(`${BASE_URL}/api/v1/summary/suggestions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    console.log("INSIGHTS API:", data);
+      console.log("INSIGHTS API:", data);
 
-    setInsights(data.insights || []);
+      setInsights(data.insights || []);
 
-  } catch (error) {
-    console.error("Failed to fetch insights:", error);
-  }
-};
+    } catch (error) {
+      console.error("Failed to fetch insights:", error);
+    }
+  };
 
-useFocusEffect(
-  useCallback(() => {
-    fetchInsights();
-  },[])
-);
+  useFocusEffect(
+    useCallback(() => {
+      fetchInsights();
+    }, [])
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -354,10 +354,10 @@ useFocusEffect(
           const data = await res.json();
 
           if (!Array.isArray(data)) {
-  console.log("Invalid transactions response:", data);
-  setTransactions([]);
-  return;
-}
+            console.log("Invalid transactions response:", data);
+            setTransactions([]);
+            return;
+          }
           setTransactions(data);
         } catch (error) {
           console.error("Failed to fetch transactions:", error);
@@ -370,25 +370,25 @@ useFocusEffect(
 
 
   interface InsightCard {
-  type: "praise" | "warning" | "consequence" | "tip";
-  icon: string;
-  title: string;
-  body: string;
-}
+    type: "praise" | "warning" | "consequence" | "tip";
+    icon: string;
+    title: string;
+    body: string;
+  }
 
-const INSIGHT_THEME: Record<InsightCard["type"], { bg: string; accent: string; icon_bg: string }> = {
-  praise: { bg: "#F0FDF4", accent: "#16A34A", icon_bg: "#DCFCE7" },
-  warning: { bg: "#FFFBEB", accent: "#D97706", icon_bg: "#FEF3C7" },
-  consequence: { bg: "#FFF1F2", accent: "#E11D48", icon_bg: "#FFE4E6" },
-  tip: { bg: "#EFF6FF", accent: "#1D4ED8", icon_bg: "#DBEAFE" },
-};
+  const INSIGHT_THEME: Record<InsightCard["type"], { bg: string; accent: string; icon_bg: string }> = {
+    praise: { bg: "#F0FDF4", accent: "#16A34A", icon_bg: "#DCFCE7" },
+    warning: { bg: "#FFFBEB", accent: "#D97706", icon_bg: "#FEF3C7" },
+    consequence: { bg: "#FFF1F2", accent: "#E11D48", icon_bg: "#FFE4E6" },
+    tip: { bg: "#EFF6FF", accent: "#1D4ED8", icon_bg: "#DBEAFE" },
+  };
 
-interface InsightCard {
-  type: "praise" | "warning" | "consequence" | "tip";
-  icon: string;
-  title: string;
-  body: string;
-}
+  interface InsightCard {
+    type: "praise" | "warning" | "consequence" | "tip";
+    icon: string;
+    title: string;
+    body: string;
+  }
 
   function InsightCardView({ item }: { item: InsightCard }) {
     const theme = INSIGHT_THEME[item.type];
@@ -506,18 +506,18 @@ interface InsightCard {
   }));
 
   const income_categoryMap = new Map(
-  incomeCategories.map(c => [c.category, c])
-);
+    incomeCategories.map(c => [c.category, c])
+  );
 
-const displayIncomeCategories = INCOME_CATEGORIES.map(cat => {
-  const data = income_categoryMap.get(cat);
+  const displayIncomeCategories = INCOME_CATEGORIES.map(cat => {
+    const data = income_categoryMap.get(cat);
 
-  return {
-    category: cat,
-    amount: data?.amount ?? 0,
-    percentage: data?.percentage ?? 0
-  };
-});
+    return {
+      category: cat,
+      amount: data?.amount ?? 0,
+      percentage: data?.percentage ?? 0
+    };
+  });
 
   const outcomeTransactions = transactions.filter(
     t => t.type === "expense"
@@ -548,25 +548,25 @@ const displayIncomeCategories = INCOME_CATEGORIES.map(cat => {
     percentage: outcomeTotal > 0 ? (c.amount / outcomeTotal) * 100 : 0
   }));
 
-    const rankedTopExpenses = [...outcomeCategories]
+  const rankedTopExpenses = [...outcomeCategories]
     .sort((a: any, b: any) => b.amount - a.amount)
     .slice(0, 3);
 
   const outcome_categoryMap = new Map(
-  outcomeCategories.map(c => [c.category, c])
-);
+    outcomeCategories.map(c => [c.category, c])
+  );
 
-const displayOutcomeCategories = OUTCOME_CATEGORIES.map(cat => {
-  const data = outcome_categoryMap.get(cat);
+  const displayOutcomeCategories = OUTCOME_CATEGORIES.map(cat => {
+    const data = outcome_categoryMap.get(cat);
 
-  return {
-    category: cat,
-    amount: data?.amount ?? 0,
-    percentage: data?.percentage ?? 0
-  };
-});
+    return {
+      category: cat,
+      amount: data?.amount ?? 0,
+      percentage: data?.percentage ?? 0
+    };
+  });
 
-const fixedExpenseTotal = outcomeTransactions
+  const fixedExpenseTotal = outcomeTransactions
     .filter((t) => isFixed(t.category))
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
 
@@ -615,19 +615,19 @@ const fixedExpenseTotal = outcomeTransactions
       return (
         <View style={styles.donutGrid}>
           {displayOutcomeCategories.map((c, index) => (
-  <View key={index} style={styles.donutItem}>
-    <CategoryDonut
-      percentage={Math.round(c.percentage)}
-      color="#EF4444"
-    />
+            <View key={index} style={styles.donutItem}>
+              <CategoryDonut
+                percentage={Math.round(c.percentage)}
+                color="#EF4444"
+              />
 
-    <Text style={styles.categoryLabel}>{c.category}</Text>
+              <Text style={styles.categoryLabel}>{c.category}</Text>
 
-    <Text style={styles.categoryAmount}>
-      RM{c.amount.toFixed(2)}
-    </Text>
-  </View>
-))}
+              <Text style={styles.categoryAmount}>
+                RM{c.amount.toFixed(2)}
+              </Text>
+            </View>
+          ))}
         </View>
       );
     }
@@ -703,80 +703,93 @@ const fixedExpenseTotal = outcomeTransactions
         </View>
       );
     }
-    
+
     // OVERVIEW TAB (DEFAULT)
     return (
       <>
         <View style={styles.expenseRow}>
 
-  <DonutProgress
-    income={incomePercentage}
-    outcome={outcomePercentage}
-  />
+          <DonutProgress
+            income={incomePercentage}
+            outcome={outcomePercentage}
+          />
 
-  <View style={styles.incomeBox}>
+          <View style={styles.incomeBox}>
 
-    <View style={styles.legendRow}>
-      <View style={[styles.dot, { backgroundColor: "#22C55E" }]} />
-      <Text>Income : RM{income.toFixed(2)}</Text>
-    </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.dot, { backgroundColor: "#22C55E" }]} />
+              <Text>Income : RM{income.toFixed(2)}</Text>
+            </View>
 
-    <View style={styles.legendRow}>
-      <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
-      <Text>Outcome : RM{outcome.toFixed(2)}</Text>
-    </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.dot, { backgroundColor: "#EF4444" }]} />
+              <Text>Outcome : RM{outcome.toFixed(2)}</Text>
+            </View>
 
-  </View>
+          </View>
 
-</View>
+        </View>
 
-{/* CASHFLOW BELOW */}
-{/* CASHFLOW + TOP CATEGORY */}
-<View style={styles.financeRow}>
+        {/* CASHFLOW BELOW */}
+        {/* CASHFLOW + TOP CATEGORY */}
+        <View style={styles.financeRow}>
 
-  {/* CASHFLOW */}
-  <View style={styles.cashflowBox}>
+          {/* CASHFLOW */}
+          <View style={styles.cashflowBox}>
 
-    <Text style={styles.cashflowTitle}>💰 Cashflow</Text>
+            <Text style={styles.cashflowTitle}>💰 Cashflow</Text>
 
-    <Text
-      style={[
-        styles.cashflowAmount,
-        { color: savings >= 0 ? "#16A34A" : "#DC2626" }
-      ]}
-    >
-      RM{savings.toFixed(2)}
-    </Text>
+            <Text
+              style={[
+                styles.cashflowAmount,
+                { color: savings >= 0 ? "#16A34A" : "#DC2626" }
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+            >
+              RM{savings.toFixed(2)}
+            </Text>
 
-    <Text style={styles.cashflowSub}>
-      {savings >= 0
-        ? "+ Positive Cashflow"
-        : "- Negative Cashflow"}
-    </Text>
+            <Text style={styles.cashflowSub}>
+              {savings >= 0
+                ? "+ Positive Cashflow"
+                : "- Negative Cashflow"}
+            </Text>
 
-  </View>
-
-
-  {/* DIVIDER */}
-  <View style={styles.financeDivider} />
+          </View>
 
 
-  {/* TOP SPENDING CATEGORY */}
-  <View style={styles.topSpendBox}>
+          {/* DIVIDER */}
+          <View style={styles.financeDivider} />
 
-    <Text style={styles.topSpendTitle}>🔥 Top Spend</Text>
 
-    <Text style={styles.topSpendCategory}>
-      {rankedTopExpenses[0]?.category ?? "None"}
-    </Text>
+          {/* TOP SPENDING CATEGORY */}
+          <View style={styles.topSpendBox}>
 
-    <Text style={styles.topSpendAmount}>
-      RM{rankedTopExpenses[0]?.amount?.toFixed(2) ?? "0.00"}
-    </Text>
+            <Text style={styles.topSpendTitle}>🔥 Top Spend</Text>
 
-  </View>
+            <Text
+              style={styles.topSpendCategory}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {rankedTopExpenses[0]?.category ?? "None"}
+            </Text>
 
-</View>
+            <Text
+              style={styles.topSpendAmount}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              RM{rankedTopExpenses[0]?.amount?.toFixed(2) ?? "0.00"}
+            </Text>
+
+          </View>
+
+        </View>
 
         {/* AI Insight Chips (Gemini via backend endpoint) */}
         {aiInsightsLoading && (
@@ -798,34 +811,34 @@ const fixedExpenseTotal = outcomeTransactions
             </Text>
             {aiInsights.map((insight, index) => (
               <View
-  key={`${insight.title}-${index}`}
-  style={[
-    styles.aiInsightCard,
-    insight.isPositive
-      ? styles.aiPositive
-      : styles.aiNegative
-  ]}
->
-  <View
-    style={[
-      styles.aiIconCircle,
-      insight.isPositive
-        ? { backgroundColor: "#DCFCE7" }
-        : { backgroundColor: "#FEE2E2" }
-    ]}
-  >
-    <Ionicons
-      name={insight.isPositive ? "checkmark" : "warning"}
-      size={16}
-      color={insight.isPositive ? "#16A34A" : "#DC2626"}
-    />
-  </View>
+                key={`${insight.title}-${index}`}
+                style={[
+                  styles.aiInsightCard,
+                  insight.isPositive
+                    ? styles.aiPositive
+                    : styles.aiNegative
+                ]}
+              >
+                <View
+                  style={[
+                    styles.aiIconCircle,
+                    insight.isPositive
+                      ? { backgroundColor: "#DCFCE7" }
+                      : { backgroundColor: "#FEE2E2" }
+                  ]}
+                >
+                  <Ionicons
+                    name={insight.isPositive ? "checkmark" : "warning"}
+                    size={16}
+                    color={insight.isPositive ? "#16A34A" : "#DC2626"}
+                  />
+                </View>
 
-  <View style={{ flex: 1 }}>
-    <Text style={styles.aiTitle}>{insight.title}</Text>
-    <Text style={styles.aiBody}>{insight.body}</Text>
-  </View>
-</View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.aiTitle}>{insight.title}</Text>
+                  <Text style={styles.aiBody}>{insight.body}</Text>
+                </View>
+              </View>
             ))}
           </View>
         )}
@@ -898,7 +911,7 @@ const fixedExpenseTotal = outcomeTransactions
         )}
       </>
     );
-    
+
   }
 
 
@@ -909,17 +922,17 @@ const fixedExpenseTotal = outcomeTransactions
       <View style={styles.topRow}>
 
         <TouchableOpacity
-    style={styles.scanBox}
-    onPress={() => router.push("/scanpage")}
-  >
-    <Ionicons name="scan-outline" size={47} color="#1E3A8A" />
-  </TouchableOpacity>
+          style={styles.scanBox}
+          onPress={() => router.push("/scanpage")}
+        >
+          <Ionicons name="scan-outline" size={47} color="#1E3A8A" />
+        </TouchableOpacity>
 
-  <ResilienceCard scoreData={overview.score} isLoading={overview.isLoading} onRetry={overview.refresh} />
+        <ResilienceCard scoreData={overview.score} isLoading={overview.isLoading} onRetry={overview.refresh} />
 
-</View>
+      </View>
 
-{fundPlan && (
+      {fundPlan && (
         <View style={styles.fundWidget}>
           <View style={styles.fundWidgetHeader}>
             <Ionicons name="shield-checkmark-outline" size={16} color="#1E3A8A" />
@@ -967,154 +980,154 @@ const fixedExpenseTotal = outcomeTransactions
             }}
           >
 
-          
+
 
             {tabs.map((tab) => (
-  <TouchableOpacity
-    key={tab.key}
-    style={[
-      styles.tabButton,
-      selectedTab === tab.key && styles.tabButtonActive  // ← add this
-    ]}
-    onPress={() => {
-      setSelectedTab(tab.key);
-    }}
-  >
-    <Ionicons
-      name={tab.icon as any}
-      size={22}
-      color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
-    />
-    <Text style={[styles.tabLabel, selectedTab === tab.key && { color: "#1E3A8A" }]}>
-      {tab.label}
-    </Text>
-  </TouchableOpacity>
-))}
+              <TouchableOpacity
+                key={tab.key}
+                style={[
+                  styles.tabButton,
+                  selectedTab === tab.key && styles.tabButtonActive  // ← add this
+                ]}
+                onPress={() => {
+                  setSelectedTab(tab.key);
+                }}
+              >
+                <Ionicons
+                  name={tab.icon as any}
+                  size={22}
+                  color={selectedTab === tab.key ? "#1E3A8A" : "#FFFFFF"}
+                />
+                <Text style={[styles.tabLabel, selectedTab === tab.key && { color: "#1E3A8A" }]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
 
 
           </View>
 
 
-       <View
-  style={{
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 15
-  }}
->
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "center",
+              alignItems: "center",
+              marginBottom: 15
+            }}
+          >
 
-{/* LEFT ARROW */}
-<TouchableOpacity
-  style={styles.monthArrow}
-  onPress={() =>
-    setSelectedMonth((prev) => (prev === 0 ? 11 : prev - 1))
-  }
->
-  <Ionicons name="chevron-back" size={22} color="#1E3A8A" />
-</TouchableOpacity>
+            {/* LEFT ARROW */}
+            <TouchableOpacity
+              style={styles.monthArrow}
+              onPress={() =>
+                setSelectedMonth((prev) => (prev === 0 ? 11 : prev - 1))
+              }
+            >
+              <Ionicons name="chevron-back" size={22} color="#1E3A8A" />
+            </TouchableOpacity>
 
-{/* MONTH SELECTOR */}
-<TouchableOpacity
-  style={styles.monthSelector}
-  onPress={() => setShowMonthModal(true)}
->
-  <Text style={styles.monthText}>
-    {months[selectedMonth]} {selectedYear}
-  </Text>
+            {/* MONTH SELECTOR */}
+            <TouchableOpacity
+              style={styles.monthSelector}
+              onPress={() => setShowMonthModal(true)}
+            >
+              <Text style={styles.monthText}>
+                {months[selectedMonth]} {selectedYear}
+              </Text>
 
-  <Ionicons name="chevron-down" size={18} color="#64748B" />
-</TouchableOpacity>
+              <Ionicons name="chevron-down" size={18} color="#64748B" />
+            </TouchableOpacity>
 
-{/* RIGHT ARROW */}
-<TouchableOpacity
-  style={styles.monthArrow}
-  onPress={() =>
-    setSelectedMonth((prev) => (prev === 11 ? 0 : prev + 1))
-  }
->
-  <Ionicons name="chevron-forward" size={22} color="#1E3A8A" />
-</TouchableOpacity>
+            {/* RIGHT ARROW */}
+            <TouchableOpacity
+              style={styles.monthArrow}
+              onPress={() =>
+                setSelectedMonth((prev) => (prev === 11 ? 0 : prev + 1))
+              }
+            >
+              <Ionicons name="chevron-forward" size={22} color="#1E3A8A" />
+            </TouchableOpacity>
 
-</View>
+          </View>
 
-<Modal
-visible={showMonthModal}
-transparent
-animationType="fade"
->
-<View style={styles.modalOverlay}>
+          <Modal
+            visible={showMonthModal}
+            transparent
+            animationType="fade"
+          >
+            <View style={styles.modalOverlay}>
 
-<View style={styles.monthModal}>
+              <View style={styles.monthModal}>
 
-<Text style={styles.modalTitle}>Select Month</Text>
+                <Text style={styles.modalTitle}>Select Month</Text>
 
-<View style={styles.monthGrid}>
-{months.map((m, index) => (
-<TouchableOpacity
-key={index}
-style={[
-styles.monthItem,
-selectedMonth === index && styles.monthItemActive
-]}
-onPress={() => setSelectedMonth(index)}
->
+                <View style={styles.monthGrid}>
+                  {months.map((m, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.monthItem,
+                        selectedMonth === index && styles.monthItemActive
+                      ]}
+                      onPress={() => setSelectedMonth(index)}
+                    >
 
-<Text
-style={[
-styles.monthTextItem,
-selectedMonth === index && { color:"#fff" }
-]}
->
-{m}
-</Text>
+                      <Text
+                        style={[
+                          styles.monthTextItem,
+                          selectedMonth === index && { color: "#fff" }
+                        ]}
+                      >
+                        {m}
+                      </Text>
 
-</TouchableOpacity>
-))}
-</View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-<View style={{ marginTop: 15 }}>
+                <View style={{ marginTop: 15 }}>
 
-<TouchableOpacity
-style={styles.yearSelector}
-onPress={() => setShowYearList(!showYearList)}
->
-<Text style={styles.yearText}>{selectedYear}</Text>
-<Ionicons name="chevron-down" size={18} />
-</TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.yearSelector}
+                    onPress={() => setShowYearList(!showYearList)}
+                  >
+                    <Text style={styles.yearText}>{selectedYear}</Text>
+                    <Ionicons name="chevron-down" size={18} />
+                  </TouchableOpacity>
 
-{showYearList && (
-<View style={styles.yearList}>
-<ScrollView showsVerticalScrollIndicator={false}>
-{years.map((y) => (
-<TouchableOpacity
-key={y}
-style={styles.yearItem}
-onPress={() => {
-setSelectedYear(y);
-setShowYearList(false);
-}}
->
-<Text style={styles.yearItemText}>{y}</Text>
-</TouchableOpacity>
-))}
-</ScrollView>
-</View>
-)}
+                  {showYearList && (
+                    <View style={styles.yearList}>
+                      <ScrollView showsVerticalScrollIndicator={false}>
+                        {years.map((y) => (
+                          <TouchableOpacity
+                            key={y}
+                            style={styles.yearItem}
+                            onPress={() => {
+                              setSelectedYear(y);
+                              setShowYearList(false);
+                            }}
+                          >
+                            <Text style={styles.yearItemText}>{y}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
 
-</View>
+                </View>
 
-<TouchableOpacity
-style={styles.doneButton}
-onPress={()=>setShowMonthModal(false)}
->
-<Text style={{color:"#fff"}}>Done</Text>
-</TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.doneButton}
+                  onPress={() => setShowMonthModal(false)}
+                >
+                  <Text style={{ color: "#fff" }}>Done</Text>
+                </TouchableOpacity>
 
-</View>
+              </View>
 
-</View>
-</Modal>
+            </View>
+          </Modal>
 
           {renderTabContent()}
         </View>
@@ -1132,42 +1145,42 @@ const styles = StyleSheet.create({
   },
 
   topRow: {
-flexDirection: "row",
-alignItems: "center",
-justifyContent: "space-between",
-marginBottom: 16,
-},
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
 
-  profileCircle:{
-width:52,
-height:52,
-borderRadius:26,
-borderWidth:1,
-borderColor:"#E5E7EB",
-},
+  profileCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
 
   healthText: {
     flex: 1,
     textAlign: "center",
   },
 
-  scanBox:{
-    marginTop : 10,
-width:75,
-height:75,
-borderRadius:18,
+  scanBox: {
+    marginTop: 10,
+    width: 75,
+    height: 75,
+    borderRadius: 18,
 
-backgroundColor:"#FFFFFF",
+    backgroundColor: "#FFFFFF",
 
-alignItems:"center",
-justifyContent:"center",
+    alignItems: "center",
+    justifyContent: "center",
 
-shadowColor:"#000000",
-shadowOffset:{width:0,height:6},
-shadowOpacity:0.2,
-shadowRadius:5,
-elevation:4
-},
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4
+  },
 
   card: {
     backgroundColor: "#FFFFFF",
@@ -1178,7 +1191,7 @@ elevation:4
   },
 
   cardLarge: {
-    marginTop : 20,
+    marginTop: 20,
     paddingTop: 40,
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
@@ -1217,7 +1230,7 @@ elevation:4
   progressTabs: {
     position: "absolute",
     alignContent: "center",
-    paddingBottom : 6,
+    paddingBottom: 6,
     top: -25,   // makes it float into card
     left: 40,
     right: 40,
@@ -1248,19 +1261,19 @@ elevation:4
     marginBottom: 15,
   },
 
-incomeBox:{
-backgroundColor:"#F1F5F9",
-paddingVertical:12,
-paddingHorizontal:18,
-borderRadius:14,
+  incomeBox: {
+    backgroundColor: "#F1F5F9",
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 14,
 
-alignItems:"center",
-justifyContent:"center",
+    alignItems: "center",
+    justifyContent: "center",
 
-alignSelf:"center",   // ⭐ center horizontally
-marginTop:15,
-marginLeft:10,
-},
+    alignSelf: "center",   // ⭐ center horizontally
+    marginTop: 15,
+    marginLeft: 10,
+  },
 
   bigNumber: {
     fontSize: 40,
@@ -1290,13 +1303,13 @@ marginLeft:10,
     backgroundColor: "#1E3A8A",
   },
 
-indicator: {
-  position: "absolute",
-  bottom: 6,
-  height: 2,
-  backgroundColor: "#FFFFFF",
-  borderRadius: 2,
-},
+  indicator: {
+    position: "absolute",
+    bottom: 6,
+    height: 2,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 2,
+  },
 
   tabButton: {
     alignItems: "center",
@@ -1322,7 +1335,7 @@ indicator: {
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 12,
-    paddingTop:18,
+    paddingTop: 18,
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
@@ -1420,262 +1433,263 @@ indicator: {
     color: "#666",
   },
 
-  sectionSub: { 
-  fontSize: 13, color: "#94A3B8", marginBottom: 12 },
+  sectionSub: {
+    fontSize: 13, color: "#94A3B8", marginBottom: 12
+  },
 
   insightCard: {
-  width: SCREEN_WIDTH * 0.85,
-  flexDirection: "row",
-  alignItems: "flex-start",
-  borderRadius: 16,
-  padding: 16,
-  backgroundColor: "#FFFFFF",
-  borderLeftWidth: 4,
+    width: SCREEN_WIDTH * 0.85,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    borderRadius: 16,
+    padding: 16,
+    backgroundColor: "#FFFFFF",
+    borderLeftWidth: 4,
 
-  shadowColor: "#000000",
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.2,
-  shadowRadius: 6,
-  elevation: 4,
-},
-
-  insightIconBox: { 
-    width: 42, 
-    height: 42, 
-    borderRadius: 21, 
-    justifyContent: "center", 
-    alignItems: "center" 
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
 
-  insightIconText: { 
-    fontSize: 20 
+  insightIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: "center",
+    alignItems: "center"
   },
 
-  insightLabel: { 
-    fontSize: 10, 
-    fontWeight: "700", 
-    letterSpacing: 1, 
-    marginBottom: 2 
+  insightIconText: {
+    fontSize: 20
   },
 
-  insightTitle: { 
-    fontSize: 14, 
-    fontWeight: "700", 
-    color: "#0F172A", 
-    marginBottom: 3 
+  insightLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 1,
+    marginBottom: 2
+  },
+
+  insightTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0F172A",
+    marginBottom: 3
   },
 
   insightBody: {
-  fontSize: 13,
-  color: "#475569",
-  lineHeight: 18,
-  flexShrink: 1
-},
+    fontSize: 13,
+    color: "#475569",
+    lineHeight: 18,
+    flexShrink: 1
+  },
 
-tabButtonActive: {
-  backgroundColor: "#FFFFFF",
-  borderRadius: 20,
-  paddingHorizontal: 10,
-  paddingVertical: 6,
-},
+  tabButtonActive: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
 
-monthDropdown: {
-  backgroundColor: "#FFFFFF",
-  borderRadius: 10,
-  paddingVertical: 8,
-  elevation: 4,
-  marginBottom: 15,
-},
+  monthDropdown: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    paddingVertical: 8,
+    elevation: 4,
+    marginBottom: 15,
+  },
 
-monthItemText: {
-  fontSize: 15,
-},
+  monthItemText: {
+    fontSize: 15,
+  },
 
-monthSelector:{
-marginTop : 10,
-flexDirection:"row",
-alignItems:"center",
-backgroundColor:"#F1F5F9",
-paddingHorizontal:14,
-paddingVertical:6,
-borderRadius:14,
-marginHorizontal:8
-},
+  monthSelector: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+    marginHorizontal: 8
+  },
 
-monthText:{
-fontSize:16,
-fontWeight:"600",
-marginRight:6
-},
+  monthText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginRight: 6
+  },
 
-modalOverlay:{
-position:"absolute",
-top:0,
-left:0,
-right:0,
-bottom:0,
-backgroundColor:"rgba(0,0,0,0.3)",
-justifyContent:"center",
-alignItems:"center",
-zIndex:1000
-},
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000
+  },
 
-monthModal:{
-width:"85%",
-backgroundColor:"#fff",
-borderRadius:20,
-padding:20
-},
+  monthModal: {
+    width: "85%",
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 20
+  },
 
-modalTitle:{
-fontSize:18,
-fontWeight:"600",
-marginBottom:15,
-textAlign:"center"
-},
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 15,
+    textAlign: "center"
+  },
 
-monthGrid:{
-flexDirection:"row",
-flexWrap:"wrap",
-justifyContent:"space-between"
-},
+  monthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between"
+  },
 
-monthItem:{
-width:"30%",
-padding:10,
-borderRadius:10,
-alignItems:"center",
-marginBottom:10
-},
+  monthItem: {
+    width: "30%",
+    padding: 10,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 10
+  },
 
-monthItemActive:{
-backgroundColor:"#1E3A8A"
-},
+  monthItemActive: {
+    backgroundColor: "#1E3A8A"
+  },
 
-monthTextItem:{
-fontSize:14
-},
+  monthTextItem: {
+    fontSize: 14
+  },
 
-yearRow:{
-flexDirection:"row",
-justifyContent:"center",
-alignItems:"center",
-marginTop:10
-},
+  yearRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 10
+  },
 
-yearText:{
-fontSize:18,
-marginHorizontal:20
-},
+  yearText: {
+    fontSize: 18,
+    marginHorizontal: 20
+  },
 
-doneButton:{
-backgroundColor:"#1E3A8A",
-padding:12,
-borderRadius:10,
-marginTop:15,
-alignItems:"center"
-},
+  doneButton: {
+    backgroundColor: "#1E3A8A",
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 15,
+    alignItems: "center"
+  },
 
-yearSelector:{
-flexDirection:"row",
-justifyContent:"center",
-alignItems:"center",
-backgroundColor:"#F1F5F9",
-paddingVertical:8,
-borderRadius:12
-},
+  yearSelector: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F1F5F9",
+    paddingVertical: 8,
+    borderRadius: 12
+  },
 
-yearList:{
-marginTop:8,
-maxHeight:150,
-backgroundColor:"#fff",
-borderRadius:12,
-paddingVertical:5,
-elevation:3
-},
+  yearList: {
+    marginTop: 8,
+    maxHeight: 150,
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingVertical: 5,
+    elevation: 3
+  },
 
-yearItem:{
-paddingVertical:8,
-alignItems:"center"
-},
+  yearItem: {
+    paddingVertical: 8,
+    alignItems: "center"
+  },
 
-yearItemText:{
-fontSize:16
-},
+  yearItemText: {
+    fontSize: 16
+  },
 
-resilienceCard:{
-  marginTop : 10,
-  flexDirection:"row",
-  alignItems:"center",
-  backgroundColor:"#FFFFFF",
-  borderRadius:20,
-  paddingHorizontal:14,
-  paddingVertical:10,
-  borderWidth:1,
-  borderColor:"#FECACA",
-  flex:1,
-  marginHorizontal:10,
-  shadowColor:"#000000",
-  shadowOffset:{width:0,height:6},
-  shadowOpacity:0.2,
-  shadowRadius:5,
-  elevation:4
-},
+  resilienceCard: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    flex: 1,
+    marginHorizontal: 10,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4
+  },
 
-resilienceRow:{
-flexDirection:"row",
-alignItems:"center",
-gap:10
-},
+  resilienceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
+  },
 
-resilienceRing:{
-width:50,
-height:50,
-borderRadius:22,
-borderWidth:3,
-alignItems:"center",
-justifyContent:"center",
-marginRight:10
-},
+  resilienceRing: {
+    width: 50,
+    height: 50,
+    borderRadius: 22,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10
+  },
 
-resilienceScore:{
-fontSize:18,
-fontWeight:"800",
-lineHeight:20
-},
+  resilienceScore: {
+    fontSize: 18,
+    fontWeight: "800",
+    lineHeight: 20
+  },
 
-resilienceMax:{
-fontSize:9,
-color:"#94A3B8"
-},
+  resilienceMax: {
+    fontSize: 9,
+    color: "#94A3B8"
+  },
 
-resilienceRight:{
-flex:1
-},
+  resilienceRight: {
+    flex: 1
+  },
 
-resilienceTierBadge:{
-alignSelf:"flex-start",
-paddingHorizontal:8,
-paddingVertical:2,
-borderRadius:12,
-borderWidth:1
-},
+  resilienceTierBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1
+  },
 
-resilienceTierText:{
-fontSize:9,
-fontWeight:"800",
-letterSpacing:1
-},
+  resilienceTierText: {
+    fontSize: 9,
+    fontWeight: "800",
+    letterSpacing: 1
+  },
 
-resilienceVerdict:{
-fontSize:12,
-color:"#475569",
-marginTop:4,
-lineHeight:16,
-flexShrink:1
-},
+  resilienceVerdict: {
+    fontSize: 12,
+    color: "#475569",
+    marginTop: 4,
+    lineHeight: 16,
+    flexShrink: 1
+  },
 
-analysisCard: {
+  analysisCard: {
     backgroundColor: "#F8FAFC",
     borderRadius: 12,
     padding: 12,
@@ -1684,14 +1698,14 @@ analysisCard: {
     borderColor: "#E2E8F0",
   },
 
-analysisSectionTitle: {
+  analysisSectionTitle: {
     fontSize: 14,
     fontWeight: "600",
     marginBottom: 10,
     color: "#0F172A",
   },
 
-   aiLoadingRow: {
+  aiLoadingRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -1703,7 +1717,7 @@ analysisSectionTitle: {
     color: "#334155",
   },
 
-    insightText: {
+  insightText: {
     flex: 1,
     fontSize: 13,
     color: "#1E3A8A",
@@ -1711,7 +1725,7 @@ analysisSectionTitle: {
     lineHeight: 19,
   },
 
-   splitBar: {
+  splitBar: {
     flexDirection: "row",
     height: 10,
     borderRadius: 5,
@@ -1800,142 +1814,142 @@ analysisSectionTitle: {
     textAlign: "right",
   },
 
-  aiInsightCard:{
-flexDirection:"row",
-alignItems:"flex-start",
-padding:14,
-borderRadius:14,
-marginTop:10,
-gap:10
-},
-
-aiPositive:{
-backgroundColor:"#F0FDF4",
-borderLeftWidth:3,
-borderLeftColor:"#16A34A"
-},
-
-aiNegative:{
-backgroundColor:"#FEF2F2",
-borderLeftWidth:3,
-borderLeftColor:"#DC2626"
-},
-
-aiIconCircle:{
-width:28,
-height:28,
-borderRadius:14,
-alignItems:"center",
-justifyContent:"center",
-marginTop:2
-},
-
-aiTitle:{
-fontSize:14,
-fontWeight:"700",
-color:"#1E3A8A",
-marginBottom:2
-},
-
-aiBody:{
-fontSize:13,
-color:"#475569",
-lineHeight:18
-},
-
-monthArrow:{
-width:36,
-height:36,
-alignItems:"center",
-justifyContent:"center"
-},
-
-cashflowCard:{ 
-  
-  backgroundColor:"#FFFFFF", 
-  borderRadius:16, 
-  padding:18, 
-  marginTop:5, 
-  marginBottom:20, 
-  shadowColor:"#000", 
-  shadowOffset:{width:0,height:3}, 
-  shadowOpacity:0.1, 
-  shadowRadius:4, 
-  elevation:3 
-}, 
-  
-  cashflowTitle:{ 
-    fontSize:14, 
-    fontWeight:"600", 
-    color:"#64748B", 
-    marginBottom:4 
-  }, 
-    
-  cashflowAmount:{ 
-    fontSize:26, 
-    fontWeight:"800",
-    marginBottom:4 
-  }, 
-  
-  cashflowSub:{ 
-    fontSize:12, 
-    color:"#94A3B8" 
+  aiInsightCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: 14,
+    borderRadius: 14,
+    marginTop: 10,
+    gap: 10
   },
 
-  financeRow:{
-flexDirection:"row",
-alignItems:"center",
-justifyContent:"space-between",
-backgroundColor:"#FFFFFF",
-borderRadius:16,
-padding:18,
-marginTop:5,
-marginBottom:20,
+  aiPositive: {
+    backgroundColor: "#F0FDF4",
+    borderLeftWidth: 3,
+    borderLeftColor: "#16A34A"
+  },
 
-shadowColor:"#000",
-shadowOffset:{width:0,height:3},
-shadowOpacity:0.1,
-shadowRadius:4,
-elevation:3
-},
+  aiNegative: {
+    backgroundColor: "#FEF2F2",
+    borderLeftWidth: 3,
+    borderLeftColor: "#DC2626"
+  },
 
-cashflowBox:{
-flex:1,
-alignItems:"flex-start"
-},
+  aiIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2
+  },
 
-financeDivider:{
-width:1,
-height:60,
-backgroundColor:"#E2E8F0",
-marginHorizontal:15
-},
+  aiTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E3A8A",
+    marginBottom: 2
+  },
 
-topSpendBox:{
-flex:1,
-alignItems:"flex-start"
-},
+  aiBody: {
+    fontSize: 13,
+    color: "#475569",
+    lineHeight: 18
+  },
 
-topSpendTitle:{
-fontSize:14,
-fontWeight:"600",
-color:"#64748B",
-marginBottom:4
-},
+  monthArrow: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center"
+  },
 
-topSpendCategory:{
-fontSize:26,
-fontWeight:"700",
-color:"#1E3A8A",
-marginBottom:2
-},
+  cashflowCard: {
 
-topSpendAmount:{
-fontSize:14,
-color:"#475569"
-},
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 18,
+    marginTop: 5,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
+  },
 
-fundWidget: {
+  cashflowTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 4
+  },
+
+  cashflowAmount: {
+    fontSize: 26,
+    fontWeight: "800",
+    marginBottom: 4
+  },
+
+  cashflowSub: {
+    fontSize: 12,
+    color: "#94A3B8"
+  },
+
+  financeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 18,
+    marginTop: 5,
+    marginBottom: 20,
+
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
+  },
+
+  cashflowBox: {
+    flex: 1,
+    alignItems: "flex-start"
+  },
+
+  financeDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: "#E2E8F0",
+    marginHorizontal: 15
+  },
+
+  topSpendBox: {
+    flex: 1,
+    alignItems: "flex-start"
+  },
+
+  topSpendTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#64748B",
+    marginBottom: 4
+  },
+
+  topSpendCategory: {
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#1E3A8A",
+    marginBottom: 2
+  },
+
+  topSpendAmount: {
+    fontSize: 14,
+    color: "#475569"
+  },
+
+  fundWidget: {
     backgroundColor: "#EFF6FF",
     borderRadius: 16,
     padding: 14,
